@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches CustomerColors in ui/theme/Theme.kt; the camera is a native View. -->
+    <color name="scanner_background">#101110</color>
+    <color name="scanner_surface">#171917</color>
+    <color name="scanner_text">#F5F6F1</color>
+    <color name="scanner_primary">#CBDDB0</color>
+    <style name="Theme.YouSong.Scanner" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/scanner_background</item>
+        <item name="android:colorAccent">@color/scanner_primary</item>
+        <item name="android:navigationBarColor">@color/scanner_background</item>
+        <item name="android:statusBarColor">@color/scanner_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+    <string name="scanner_title">Escanea el QR del local</string>
+    <string name="scanner_help">Coloca el QR dentro del recuadro. Lo leeremos automáticamente.</string>
+    <string name="scanner_cancel">Cancelar escaneo</string>
+</resources>

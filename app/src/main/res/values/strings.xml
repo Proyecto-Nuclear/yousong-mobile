@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">YouSong</string>
+    <!-- Deployment origin only, never a credential. Can also be entered at runtime. -->
+    <string name="api_base_url" translatable="false"></string>
+</resources>
