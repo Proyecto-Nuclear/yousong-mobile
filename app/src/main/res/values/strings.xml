@@ -35,6 +35,8 @@
     <string name="leave_confirm">Salir</string>
     <string name="leave_cancel">Quedarme</string>
     <string name="leaving">Saliendo…</string>
+    <string name="leave_as">Saldrás como %1$s</string>
+    <string name="tap_refused_busy">Un momento, estamos actualizando la cola. Inténtalo de nuevo.</string>
     <string name="view_only_title">Por ahora solo puedes ver la cola</string>
     <string name="refresh_description">Actualizar la cola</string>
     <string name="now_playing_label">Sonando ahora</string>
@@ -64,7 +66,7 @@
     <string name="suggestion_song_description">Canción: %1$s</string>
     <string name="suggestion_query_description">Buscar: %1$s</string>
     <string name="search_idle_title">Empieza con un nombre</string>
-    <string name="search_idle_body">Escribe al menos dos letras y te mostramos lo que hay en el catálogo.</string>
+    <string name="search_idle_body">Escribe al menos dos letras y toca buscar en el teclado.</string>
     <string name="search_empty_title">No encontramos esa canción</string>
     <string name="search_empty_body">Prueba con otro título o con el nombre del artista.</string>
     <string name="search_error_title">La búsqueda no respondió</string>

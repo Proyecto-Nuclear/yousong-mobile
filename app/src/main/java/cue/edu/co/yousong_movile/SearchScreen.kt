@@ -13,7 +13,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,82 +39,125 @@ internal sealed interface SearchPhase {
     data class Failed(val message: String) : SearchPhase
 }
 
-/** Owns catalog search: a single debounce feeds both suggestions and paginated results. */
-@Composable
-internal fun SearchScreen(api: ParticipantApi, token: String, ui: QueueUi, onExpired: (String) -> Unit,
-    onOpen: (Song) -> Unit, onQuick: (Song) -> Unit, modifier: Modifier = Modifier) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var submitted by remember { mutableStateOf<String?>(null) }
-    var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var nextPage by remember { mutableStateOf<String?>(null) }
-    var requestedPage by remember { mutableStateOf<String?>(null) }
-    var retry by remember { mutableIntStateOf(0) }
-    var loading by remember { mutableStateOf(false) }
-    var searched by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var suggestions by remember { mutableStateOf<List<Suggestion>>(emptyList()) }
-    var dismissed by remember { mutableStateOf(false) }
-    // The one debounce: typing settles for 350 ms before suggestions and search both run.
-    LaunchedEffect(query) {
-        val normalized = ClientContract.query(query)
-        if (normalized == null) { submitted = null; return@LaunchedEffect }
-        delay(350)
-        submitted = normalized
+/** One explicit search: the first page (`page == null`) or a "ver más" page. [seq] makes retries distinct. */
+internal data class Submission(val seq: Long, val query: String, val page: String?)
+
+/**
+ * Catalog search state. It lives above the tab and confirmation branches so results survive
+ * switching tabs; only the typed text is saved across rotation (never results or credentials).
+ * Searching spends the venue's daily budget, so results load only on an explicit submit or page
+ * request, never on keystrokes; typing only feeds the (debounced) suggestions.
+ */
+@Stable
+internal class SearchState(initialQuery: String = "") {
+    var query by mutableStateOf(initialQuery)
+        private set
+    var submission by mutableStateOf<Submission?>(null)
+        private set
+    var songs by mutableStateOf<List<Song>>(emptyList())
+    var nextPage by mutableStateOf<String?>(null)
+    var loading by mutableStateOf(false)
+    var searched by mutableStateOf(false)
+    var error by mutableStateOf<String?>(null)
+    var suggestions by mutableStateOf<List<Suggestion>>(emptyList())
+    var suggestedFor: String? = null
+    var dismissed by mutableStateOf(false)
+    /** The submission whose results are on screen; a recomposed effect never refetches it. */
+    var loadedFor: Submission? = null
+    private var seq = 0L
+
+    fun edit(text: String) {
+        query = text
+        dismissed = false
+        if (text.isEmpty()) clear()
     }
-    LaunchedEffect(api, token, submitted) {
-        suggestions = emptyList()
-        val normalized = submitted ?: return@LaunchedEffect
-        try { suggestions = api.suggestions(token, normalized) }
+
+    /** Explicit search (keyboard action or a phrase suggestion). Re-submitting the shown query is free. */
+    fun submit(text: String = query) {
+        query = text
+        dismissed = true
+        val normalized = ClientContract.query(text) ?: return
+        val current = submission
+        if (current != null && current.query == normalized && error == null) return
+        submission = Submission(++seq, normalized, null)
+    }
+
+    fun more() {
+        val current = submission ?: return
+        val page = nextPage ?: return
+        if (!loading) submission = Submission(++seq, current.query, page)
+    }
+
+    fun retry() { submission = submission?.let { it.copy(seq = ++seq) } }
+
+    private fun clear() {
+        submission = null; loadedFor = null; songs = emptyList(); nextPage = null; searched = false; error = null
+        suggestions = emptyList(); suggestedFor = null
+    }
+
+    val phase: SearchPhase get() = when {
+        error != null && songs.isEmpty() -> SearchPhase.Failed(error!!)
+        submission == null && songs.isEmpty() -> SearchPhase.Idle
+        loading && songs.isEmpty() -> SearchPhase.Loading
+        searched && songs.isEmpty() -> SearchPhase.Empty
+        songs.isNotEmpty() -> SearchPhase.Results(songs, nextPage != null, loading)
+        else -> SearchPhase.Loading
+    }
+
+    companion object {
+        val Saver: Saver<SearchState, String> = Saver(save = { it.query }, restore = { SearchState(it) })
+    }
+}
+
+@Composable
+internal fun SearchScreen(api: ParticipantApi, token: String, state: SearchState, ui: QueueUi, onExpired: (String) -> Unit,
+    onOpen: (Song) -> Unit, onQuick: (Song) -> Unit, modifier: Modifier = Modifier) {
+    // Suggestions: the one debounce, on typing only, skipped once a search was submitted.
+    LaunchedEffect(api, token, state.query, state.dismissed) {
+        val normalized = ClientContract.query(state.query)
+        if (normalized == null || state.dismissed) { state.suggestions = emptyList(); return@LaunchedEffect }
+        if (state.suggestedFor == normalized) return@LaunchedEffect
+        delay(350)
+        try { state.suggestions = api.suggestions(token, normalized); state.suggestedFor = normalized }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {
             // Suggestions are optional help; the search itself reports failures.
             if (failure is ApiFailure && failure.status == 401) onExpired(errorLabel(failure))
         }
     }
-    LaunchedEffect(api, token, submitted, requestedPage, retry) {
-        val normalized = submitted
-        error = null
-        if (requestedPage == null) { songs = emptyList(); nextPage = null; searched = false }
-        if (normalized == null) { loading = false; return@LaunchedEffect }
-        loading = true
+    // Results: only explicit submissions reach the network.
+    LaunchedEffect(api, token, state.submission) {
+        val submission = state.submission ?: return@LaunchedEffect
+        if (submission == state.loadedFor) return@LaunchedEffect
+        state.error = null
+        if (submission.page == null) { state.songs = emptyList(); state.nextPage = null; state.searched = false }
+        state.loading = true
         try {
-            val result = api.search(token, normalized, requestedPage)
-            songs = if (requestedPage == null) result.songs else (songs + result.songs).distinctBy { it.videoId }
-            nextPage = result.nextPage; searched = true
+            val result = api.search(token, submission.query, submission.page)
+            state.songs = if (submission.page == null) result.songs else (state.songs + result.songs).distinctBy { it.videoId }
+            state.nextPage = result.nextPage; state.searched = true
+            state.loadedFor = submission
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {
-            error = errorLabel(failure)
+            state.error = errorLabel(failure)
             if (failure is ApiFailure && failure.status == 401) onExpired(errorLabel(failure))
-        } finally { loading = false }
-    }
-    val phase = when {
-        error != null && songs.isEmpty() -> SearchPhase.Failed(error!!)
-        submitted == null && songs.isEmpty() && !loading -> SearchPhase.Idle
-        loading && songs.isEmpty() -> SearchPhase.Loading
-        searched && songs.isEmpty() -> SearchPhase.Empty
-        songs.isNotEmpty() -> SearchPhase.Results(songs, nextPage != null, loading)
-        else -> SearchPhase.Loading
+        } finally { state.loading = false }
     }
     SearchContent(
-        query = query,
-        onQuery = { query = it; requestedPage = null; dismissed = false },
-        onSubmit = {
-            ClientContract.query(query)?.let { submitted = it; requestedPage = null }
-            dismissed = true
-        },
-        suggestions = if (dismissed || ClientContract.query(query) == null) emptyList() else suggestions,
+        query = state.query,
+        onQuery = state::edit,
+        onSubmit = { state.submit() },
+        suggestions = if (state.dismissed || ClientContract.query(state.query) == null) emptyList() else state.suggestions,
         onSuggestion = { suggestion ->
-            dismissed = true
             val song = suggestion.song
-            if (song != null) onOpen(song)
-            else { query = suggestion.text; submitted = ClientContract.query(suggestion.text); requestedPage = null }
+            if (song != null) { state.dismissed = true; onOpen(song) } else state.submit(suggestion.text)
         },
-        phase = phase,
+        phase = state.phase,
         ui = ui,
         onOpen = onOpen,
         onQuick = onQuick,
-        onMore = { if (!loading) requestedPage = nextPage },
-        onRetry = { retry++ },
+        onMore = state::more,
+        onRetry = state::retry,
         modifier = modifier,
     )
 }

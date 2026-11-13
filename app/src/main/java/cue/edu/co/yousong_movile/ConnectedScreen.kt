@@ -74,13 +74,21 @@ private fun ConnectedSessionScreen(api: ParticipantApi, session: ParticipantSess
     }
     LaunchedEffect(actions.pending) { if (!actions.pending) target = null }
 
+    // The UI only offers these taps when the song looks actionable; if the coordinator's gate
+    // still refuses (a poll is reconciling), say so instead of dropping the tap silently.
+    fun refused() {
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            snackbar.showSnackbar(Notice(resources.getString(R.string.tap_refused_busy), success = false))
+        }
+    }
     fun request(song: Song) {
-        actions.request(song)
-        if (actions.pending) target = ActionTarget(song.videoId, song.title, song.artist, song.thumbnailUrl)
+        if (actions.request(song)) target = ActionTarget(song.videoId, song.title, song.artist, song.thumbnailUrl)
+        else refused()
     }
     fun vote(item: QueueItem) {
-        actions.vote(item.requestId, item.voted)
-        if (actions.pending) target = ActionTarget(item.requestId, item.song.title, item.song.artist, item.song.thumbnailUrl)
+        if (actions.vote(item.requestId, item.voted)) target = ActionTarget(item.requestId, item.song.title, item.song.artist, item.song.thumbnailUrl)
+        else refused()
     }
 
     BackHandler(enabled = confirmation != null || backTarget(tab) != null) {
@@ -88,11 +96,14 @@ private fun ConnectedSessionScreen(api: ParticipantApi, session: ParticipantSess
     }
 
     val ui = QueueUi(actions.snapshot, interactive, target?.id, actions.loading, actions.error)
+    // Above the tab branches so results survive tabs and the confirmation; only the query is saved.
+    val search = rememberSaveable(saver = SearchState.Saver) { SearchState() }
+    val busy = actions.loading || actions.pending
     val snapshot = actions.snapshot
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            ShellTopBar(if (tab == Tab.Inicio) null else actions.status.name, actions.loading, leaving,
+            ShellTopBar(if (tab == Tab.Inicio) null else actions.status.name, busy, leaving,
                 onRefresh = actions::refresh, onLeave = { askLeave = true })
         },
         snackbarHost = { YouSongSnackbarHost(snackbar) },
@@ -104,18 +115,23 @@ private fun ConnectedSessionScreen(api: ParticipantApi, session: ParticipantSess
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            ShellBanner(actions, interactive)
+            ShellBanner(actions, interactive, contentShowsError = tab != Tab.Buscar)
             Box(Modifier.weight(1f)) {
                 val current = confirmation
-                if (current != null) ConfirmationScreen(current,
-                    onQueue = { confirmation = null; tab = Tab.Cola },
-                    onSearch = { confirmation = null; tab = Tab.Buscar })
-                else when (tab) {
+                // The confirmation is drawn over the tab, which stays composed (and keeps its state)
+                // but is hidden from accessibility while covered.
+                Box(if (current != null) Modifier.fillMaxSize().clearAndSetSemantics {} else Modifier.fillMaxSize()) {
+                when (tab) {
                     Tab.Inicio -> HomeScreen(actions.status.name, ui, onSearch = { tab = Tab.Buscar }, onQueue = { tab = Tab.Cola },
                         onVote = ::vote, onRetry = actions::refresh)
-                    Tab.Buscar -> SearchScreen(api, session.token, ui, onExpired = { onEnded(it) },
+                    Tab.Buscar -> SearchScreen(api, session.token, search, ui, onExpired = { onEnded(it) },
                         onOpen = { selected = it }, onQuick = ::request)
                     Tab.Cola -> QueueScreen(ui, onVote = ::vote, onRetry = actions::refresh, onSearch = { tab = Tab.Buscar })
+                }
+                }
+                if (current != null) Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    ConfirmationScreen(current, onQueue = { confirmation = null; tab = Tab.Cola },
+                        onSearch = { confirmation = null; tab = Tab.Buscar })
                 }
             }
         }
@@ -124,7 +140,7 @@ private fun ConnectedSessionScreen(api: ParticipantApi, session: ParticipantSess
         SongDetail(song, songCta(song, snapshot, interactive), target?.id == song.videoId,
             onAction = { request(song) }, onDismiss = { selected = null })
     }
-    if (askLeave) LeaveDialog(onConfirm = {
+    if (askLeave) LeaveDialog(actions.status.pseudonym, confirmEnabled = !leaving && !actions.pending, onConfirm = {
         askLeave = false
         if (leaving || actions.pending) return@LeaveDialog
         leaving = true
@@ -190,10 +206,12 @@ internal fun ShellNavigation(tab: Tab, queued: Int, onSelect: (Tab) -> Unit) {
 
 /** One quiet line under the top bar when actions are not possible right now. */
 @Composable
-private fun ShellBanner(actions: SongActions, interactive: Boolean) {
-    val snapshot = actions.snapshot ?: return
-    val problem = actions.error ?: actions.statusError
-    val viewOnly = !interactive && snapshot.state == ServiceState.ABIERTO && !actions.loading && !actions.pending
+private fun ShellBanner(actions: SongActions, interactive: Boolean, contentShowsError: Boolean) {
+    val snapshot = actions.snapshot
+    // Before the first queue load, Inicio and Cola show their own full offline state; Buscar does not.
+    val problem = if (snapshot == null && contentShowsError) actions.statusError?.takeIf { actions.error == null }
+        else actions.error ?: actions.statusError
+    val viewOnly = snapshot != null && !interactive && snapshot.state == ServiceState.ABIERTO && !actions.loading && !actions.pending
     if (problem == null && !viewOnly) return
     Surface(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.xxs),
         shape = MaterialTheme.shapes.medium,
@@ -205,7 +223,9 @@ private fun ShellBanner(actions: SongActions, interactive: Boolean) {
                 Text(problem ?: actions.availabilityMessage, style = MaterialTheme.typography.bodySmall,
                     color = if (problem != null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            TextButton(onClick = actions::refresh) { Text(stringResource(R.string.action_retry)) }
+            TextButton(onClick = actions::refresh, enabled = !actions.loading && !actions.pending) {
+                Text(stringResource(R.string.action_retry))
+            }
         }
     }
 }
@@ -260,10 +280,17 @@ internal fun ConfirmationScreen(confirmation: Confirmation, onQueue: () -> Unit,
 }
 
 @Composable
-private fun LeaveDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun LeaveDialog(pseudonym: String, confirmEnabled: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         title = { Text(stringResource(R.string.leave_title)) },
-        text = { Text(stringResource(R.string.leave_body)) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(stringResource(R.string.leave_confirm)) } },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(stringResource(R.string.leave_body))
+                // Only shown here, on screen: never logged, saved or sent to a snackbar.
+                if (pseudonym.isNotBlank()) Text(stringResource(R.string.leave_as, pseudonym),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        confirmButton = { TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text(stringResource(R.string.leave_confirm)) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.leave_cancel)) } })
 }
