@@ -1,5 +1,161 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="es">
     <string name="app_name">YouSong</string>
     <!-- Deployment origin only, never a credential. Can also be entered at runtime. -->
     <string name="api_base_url" translatable="false"></string>
+
+    <!-- Shared -->
+    <string name="meta_artist_duration">%1$s · %2$s</string>
+    <string name="cover_description">Portada de %1$s</string>
+    <string name="action_retry">Reintentar</string>
+    <string name="action_close">Cerrar</string>
+    <string name="action_refresh">Actualizar</string>
+    <string name="unverified_artist_note">Artista según el canal de YouTube</string>
+    <plurals name="votes_count">
+        <item quantity="one">%1$d voto</item>
+        <item quantity="many">%1$d votos</item>
+        <item quantity="other">%1$d votos</item>
+    </plurals>
+    <plurals name="songs_count">
+        <item quantity="one">%1$d canción</item>
+        <item quantity="many">%1$d canciones</item>
+        <item quantity="other">%1$d canciones</item>
+    </plurals>
+    <string name="wait_minutes">Espera ~ %1$d min</string>
+    <string name="wait_now">Suena enseguida</string>
+
+    <!-- Shell -->
+    <string name="brand_mark_description">YouSong</string>
+    <string name="tab_home">Inicio</string>
+    <string name="tab_search">Buscar</string>
+    <string name="tab_queue">Cola</string>
+    <string name="queue_badge_description">%1$d en cola</string>
+    <string name="leave_action">Salir del local</string>
+    <string name="leave_title">¿Salir del local?</string>
+    <string name="leave_body">Para volver a pedir canciones tendrás que escanear el QR otra vez.</string>
+    <string name="leave_confirm">Salir</string>
+    <string name="leave_cancel">Quedarme</string>
+    <string name="leaving">Saliendo…</string>
+    <string name="view_only_title">Por ahora solo puedes ver la cola</string>
+    <string name="refresh_description">Actualizar la cola</string>
+    <string name="now_playing_label">Sonando ahora</string>
+    <string name="now_playing_remaining">Quedan %1$s</string>
+    <string name="now_playing_description">Sonando ahora: %1$s, de %2$s</string>
+
+    <!-- Inicio -->
+    <string name="home_tagline">Elige lo que viene.</string>
+    <string name="home_search_entry">Busca la canción que falta</string>
+    <string name="favourite_label">La favorita del público</string>
+    <string name="vote_for_this_song">Votar por esta canción</string>
+    <string name="up_next">A continuación</string>
+    <string name="see_full_queue">Ver la cola completa</string>
+    <string name="no_playback_kicker">Sin reproducción activa</string>
+    <string name="no_playback_title">El local está preparando la música</string>
+    <string name="no_playback_body">Busca una canción y sé el primero en pedirla.</string>
+    <string name="empty_queue_title">La cola está vacía</string>
+    <string name="empty_queue_body">Pide una canción y abre la noche.</string>
+    <string name="empty_queue_action">Buscar canciones</string>
+
+    <!-- Buscar -->
+    <string name="search_title">Algo para esta noche</string>
+    <string name="search_subtitle">Busca por canción, artista o un pedazo de la letra.</string>
+    <string name="search_hint">¿Qué quieres escuchar?</string>
+    <string name="search_clear">Borrar búsqueda</string>
+    <string name="search_results">Resultados</string>
+    <string name="suggestion_song_description">Canción: %1$s</string>
+    <string name="suggestion_query_description">Buscar: %1$s</string>
+    <string name="search_idle_title">Empieza con un nombre</string>
+    <string name="search_idle_body">Escribe al menos dos letras y te mostramos lo que hay en el catálogo.</string>
+    <string name="search_empty_title">No encontramos esa canción</string>
+    <string name="search_empty_body">Prueba con otro título o con el nombre del artista.</string>
+    <string name="search_error_title">La búsqueda no respondió</string>
+    <string name="search_more">Ver más canciones</string>
+    <string name="search_loading">Buscando canciones</string>
+    <string name="quick_request_description">Pedir %1$s</string>
+    <string name="quick_vote_description">Votar por %1$s</string>
+
+    <!-- Detalle -->
+    <string name="detail_title">Detalle de la canción</string>
+    <string name="cta_request">Pedir esta canción</string>
+    <string name="cta_vote">Votar por esta canción</string>
+    <string name="cta_voted">Ya votaste por esta canción</string>
+    <string name="cta_unavailable">Ahora no se puede pedir</string>
+    <string name="cta_pending">Enviando…</string>
+    <string name="detail_how_it_works">Pedirla cuenta como tu primer voto. Puedes votar una vez por cada canción.</string>
+
+    <!-- Confirmación y avisos -->
+    <string name="confirm_title">Ya está en la cola.</string>
+    <string name="confirm_position">Va en el puesto %1$d. Ahora el público puede votar por ella.</string>
+    <string name="confirm_no_position">Ahora el público puede votar por ella.</string>
+    <string name="confirm_view_queue">Ver la cola</string>
+    <string name="confirm_keep_searching">Seguir buscando</string>
+    <string name="snack_voted">Voto registrado para «%1$s».</string>
+    <string name="snack_voted_generic">Voto registrado.</string>
+
+    <!-- Cola -->
+    <string name="queue_title">Cola en vivo</string>
+    <string name="queue_subtitle">Un voto puede cambiar lo que viene.</string>
+    <string name="chip_live">En vivo</string>
+    <string name="chip_paused">En pausa</string>
+    <string name="chip_closed">Cerrado</string>
+    <string name="chip_maintenance">En mantenimiento</string>
+    <string name="queue_wait_note">La espera es orientativa y cambia con los votos.</string>
+    <string name="vote_action_description">Votar por %1$s, %2$s</string>
+    <string name="voted_description">Ya votaste por %1$s, %2$s</string>
+    <string name="vote_pending_description">Enviando tu voto por %1$s</string>
+    <string name="vote_unavailable_paused">Votos en pausa para %1$s</string>
+    <string name="vote_unavailable_unknown">Actualiza la cola para votar por %1$s</string>
+    <string name="vote_unavailable_wait">Un momento: aún no puedes votar por %1$s</string>
+    <string name="position_description">Puesto %1$d</string>
+    <string name="paused_inline">El local pausó las peticiones. Puedes seguir viendo la cola.</string>
+
+    <!-- Estados de pantalla completa -->
+    <string name="state_ended_title">La noche terminó</string>
+    <string name="state_left_title">Saliste del local</string>
+    <string name="state_session_over_title">Tu sesión terminó</string>
+    <string name="state_scan_again">Escanear otro código</string>
+    <string name="state_paused_title">Pausa un momento</string>
+    <string name="state_paused_body">El local pausó las peticiones. Vuelve a mirar en unos minutos.</string>
+    <string name="state_maintenance_title">Estamos afinando el sistema</string>
+    <string name="state_maintenance_body">El local está en mantenimiento. Las peticiones vuelven pronto.</string>
+    <string name="state_closed_title">El local está cerrado</string>
+    <string name="state_closed_body">Ahora no admite peticiones. Vuelve a escanear cuando abra.</string>
+    <string name="state_offline_title">Sin conexión con el local</string>
+    <string name="state_camera_title">Necesitamos la cámara</string>
+    <string name="state_camera_body">Para leer el QR del local, permite el uso de la cámara en los ajustes.</string>
+    <string name="state_camera_action">Abrir ajustes</string>
+
+    <!-- Entrada -->
+    <string name="entry_title">Elige lo que viene.</string>
+    <string name="entry_body">Escanea el QR del local para pedir canciones y votar por las que quieres oír.</string>
+    <string name="scan_qr">Escanear QR</string>
+    <string name="scan_other_qr">Escanear otro QR</string>
+    <string name="entry_no_account">No necesitas cuenta. Solo el QR del local.</string>
+    <string name="entry_not_configured">El servicio no está configurado correctamente. Contacta al establecimiento.</string>
+    <string name="entry_connecting">Conectando con el local…</string>
+    <string name="entry_joining">Entrando…</string>
+    <string name="entry_scan_cancelled">Escaneo cancelado. Puedes volver a escanear el QR.</string>
+    <string name="entry_scan_invalid">Ese QR no es de un local de YouSong. Escanea el que está en tu mesa.</string>
+    <string name="entry_not_found">No encontramos ese local. Vuelve a escanear su QR.</string>
+    <string name="entry_offline">No pudimos conectar con el local. Revisa tu conexión y vuelve a escanear.</string>
+    <string name="entry_refresh_state">Actualizar estado</string>
+    <string name="entry_refresh_first">Actualiza el estado del local para continuar. Tu permiso no se marca solo.</string>
+    <string name="service_live">Abierto: puedes pedir canciones</string>
+    <string name="service_full">Abierto, pero no admite más personas ahora</string>
+    <string name="service_paused">En pausa</string>
+    <string name="service_closed">Cerrado</string>
+    <string name="service_maintenance">En mantenimiento</string>
+    <string name="service_unknown">Estado desconocido</string>
+    <string name="opening_today">Abre hoy a las %1$s</string>
+    <string name="opening_tomorrow">Abre mañana a las %1$s</string>
+    <string name="opening_other">Abre el %1$s a las %2$s</string>
+    <string name="privacy_title">Tu privacidad</string>
+    <string name="privacy_version">Política versión %1$s</string>
+    <string name="consent_required">Necesario para participar</string>
+    <string name="consent_optional">Opcional: ayudarnos a mejorar</string>
+    <string name="consent_required_body">Usar un alias anónimo para pedir canciones y votar en este local.</string>
+    <string name="consent_optional_body">Responder preguntas breves sobre cómo te fue con la app.</string>
+    <string name="join_action">Entrar al local</string>
+    <string name="joined_notice_unsafe">No se pudo guardar la sesión de forma segura. Si cierras la app tendrás que entrar de nuevo.</string>
+    <string name="session_expired_notice">Tu acceso a esta noche caducó. Vuelve a escanear el QR.</string>
+    <string name="left_notice">Saliste del local.</string>
 </resources>

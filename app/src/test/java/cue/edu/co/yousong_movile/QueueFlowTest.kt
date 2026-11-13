@@ -61,14 +61,14 @@ class QueueFlowTest {
     }
 
     @Test fun exactSpanishErrorsDistinguishAlreadyVotedForbiddenAndQuota() {
-        assertEquals("Ya apoyaste esta canción en esta sesión.", errorLabel(ApiFailure(409, "ALREADY_VOTED")))
-        assertEquals("No tienes permiso para esta acción.", errorLabel(ApiFailure(403, "FORBIDDEN")))
+        assertEquals("Ya votaste por esta canción.", errorLabel(ApiFailure(409, "ALREADY_VOTED")))
+        assertEquals("No puedes hacer esto desde tu sesión.", errorLabel(ApiFailure(403, "FORBIDDEN")))
         assertEquals("La cuota del catálogo se agotó. Inténtalo más tarde.", errorLabel(ApiFailure(503, "CATALOG_QUOTA_EXCEEDED")))
         assertEquals("El catálogo de música no está configurado. Consulta al personal.", errorLabel(ApiFailure(503, "CATALOG_NOT_CONFIGURED")))
         assertEquals("El local agotó sus búsquedas de hoy. Consulta al personal.", errorLabel(ApiFailure(429, "SEARCH_BUDGET_EXHAUSTED")))
-        assertEquals("Demasiadas solicitudes. Espera un momento antes de reintentar.", errorLabel(ApiFailure(429, "RATE_LIMITED")))
-        assertEquals("La sesión terminó o la credencial caducó. Vuelve a unirte.", errorLabel(ApiFailure(401, "SESSION_ENDED")))
-        assertEquals("La sesión terminó o la credencial caducó. Vuelve a unirte.", errorLabel(ApiFailure(401, "INVALID_CREDENTIAL")))
+        assertEquals("Vas muy rápido. Espera un momento y vuelve a intentarlo.", errorLabel(ApiFailure(429, "RATE_LIMITED")))
+        assertEquals("Tu sesión terminó o tu acceso caducó. Vuelve a escanear el QR del local.", errorLabel(ApiFailure(401, "SESSION_ENDED")))
+        assertEquals("Tu sesión terminó o tu acceso caducó. Vuelve a escanear el QR del local.", errorLabel(ApiFailure(401, "INVALID_CREDENTIAL")))
     }
 
     private fun snapshot(version: Long, state: ServiceState = ServiceState.ABIERTO) =

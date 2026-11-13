@@ -15,6 +15,10 @@ class ScannerOptionsTest {
         val extras = qrScannerOptions().moreExtras
         assertEquals(false, extras[Intents.Scan.BEEP_ENABLED])
         assertEquals(false, extras[Intents.Scan.BARCODE_IMAGE_ENABLED])
-        assertEquals("Escanea el QR del establecimiento", extras[Intents.Scan.PROMPT_MESSAGE])
+        assertEquals("Apunta al QR del local", extras[Intents.Scan.PROMPT_MESSAGE])
+    }
+
+    @Test fun forwardsTheLocalizedPrompt() {
+        assertEquals("Apunta al QR de tu mesa", qrScannerOptions("Apunta al QR de tu mesa").moreExtras[Intents.Scan.PROMPT_MESSAGE])
     }
 }

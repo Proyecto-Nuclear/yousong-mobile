@@ -15,7 +15,7 @@ class AvailabilityContractTest {
         assertFalse(readiness.accept(Establishment("Same name", "sala-azul", "ABIERTO", true)))
         assertFalse(readiness.canAct(ServiceState.ABIERTO, "ABIERTO"))
         assertNull(readiness.availability)
-        assertEquals("No se conservó la identidad QR de esta sesión. Puedes consultar la cola. Para volver a participar, sal del local desde Inicio; solo después de una salida confirmada escanea el QR y autoriza F1 de nuevo.", readiness.label)
+        assertEquals("No pudimos confirmar el local de esta sesión. Puedes ver la cola; para pedir canciones, sal del local y vuelve a escanear su QR.", readiness.label)
     }
 
     @Test fun onlyMatchingExplicitlyAvailableEstablishmentEnablesActions() {

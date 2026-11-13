@@ -45,7 +45,7 @@ internal class SessionReadiness(qrSlug: String?) {
             availability?.let(::canParticipate) == true
 
     val label: String get() = if (slug == null) {
-        "No se conservó la identidad QR de esta sesión. Puedes consultar la cola. Para volver a participar, sal del local desde Inicio; solo después de una salida confirmada escanea el QR y autoriza F1 de nuevo."
+        "No pudimos confirmar el local de esta sesión. Puedes ver la cola; para pedir canciones, sal del local y vuelve a escanear su QR."
     } else availability?.let(::availabilityLabel)
-        ?: "No se pudo confirmar la disponibilidad del local. Puedes consultar la cola; actualiza el estado antes de solicitar o votar."
+        ?: "No pudimos confirmar si el local está abierto. Puedes ver la cola mientras tanto."
 }

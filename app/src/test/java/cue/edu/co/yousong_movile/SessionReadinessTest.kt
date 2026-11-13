@@ -48,7 +48,7 @@ class SessionReadinessTest {
     }
 
     @Test fun sessionNotAcceptingExplainsReadOnlyQueueWithoutReportingSuccess() {
-        assertEquals("La sesión no admite solicitudes ni votos ahora. Actualiza el estado; puedes seguir consultando la cola.",
+        assertEquals("Ahora no se aceptan peticiones ni votos. Puedes seguir viendo la cola.",
             errorLabel(ApiFailure(409, "SESSION_NOT_ACCEPTING")))
     }
 
