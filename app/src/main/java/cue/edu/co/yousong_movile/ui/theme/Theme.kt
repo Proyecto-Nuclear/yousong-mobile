@@ -1,23 +1,39 @@
 package cue.edu.co.yousong_movile.ui.theme
 
+import android.content.Context
+import android.provider.Settings
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.platform.LocalContext
 
-private val CustomerColors = darkColorScheme(
-    primary = Color(0xFFCBDDB0),
-    onPrimary = Color(0xFF172012),
-    secondary = Color(0xFFB9CBD8),
-    background = Color(0xFF101110),
-    surface = Color(0xFF171917),
-    surfaceVariant = Color(0xFF2A2E29),
-    onBackground = Color(0xFFF5F6F1),
-    onSurface = Color(0xFFF5F6F1),
-    error = Color(0xFFFFB4AB)
-)
+/** True when the system "remove animations" setting is on; ambient motion must stop. */
+val LocalReduceMotion = staticCompositionLocalOf { false }
+
+internal fun systemReducesMotion(context: Context): Boolean = runCatching {
+    Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+}.getOrDefault(false)
 
 @Composable
-fun YousongmovileTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = CustomerColors, typography = Typography, content = content)
+fun YousongmovileTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val reduceMotion = remember(context) { systemReducesMotion(context) }
+    CompositionLocalProvider(
+        LocalYouSongExtras provides if (darkTheme) DarkExtras else LightExtras,
+        LocalReduceMotion provides reduceMotion,
+    ) {
+        MaterialTheme(
+            colorScheme = if (darkTheme) DarkColors else LightColors,
+            typography = Typography,
+            shapes = YouSongShapes,
+            content = content,
+        )
+    }
+}
+
+object YouSongTheme {
+    val extras: YouSongExtras @Composable get() = LocalYouSongExtras.current
 }

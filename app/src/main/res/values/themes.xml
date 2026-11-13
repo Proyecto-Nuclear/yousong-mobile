@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Yousongmovile" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Window colors match the Compose theme so cold start never flashes a different ground.
+         Light is selected only when the system is in light mode (see values-night). -->
+    <style name="Theme.Yousongmovile" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:colorAccent">@color/brand_primary</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>
