@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.dp
@@ -105,11 +106,20 @@ internal fun DurationBadge(text: String, modifier: Modifier = Modifier) {
         style = MaterialTheme.typography.labelMedium.tabular(), color = androidx.compose.ui.graphics.Color.White)
 }
 
+internal const val COVER_IMAGE_TAG = "cover-image"
+internal const val COVER_PLACEHOLDER_TAG = "cover-placeholder"
+
 /** Loads a cover through [LocalCoverLoader]; production always uses the anonymous HTTPS loader. */
 internal val LocalCoverLoader = staticCompositionLocalOf<suspend (String) -> ImageBitmap?> { { secureCover(it) } }
 
 @Composable
 internal fun Cover(url: String?, title: String, modifier: Modifier = Modifier, decorative: Boolean = true) {
+    // A new url is a new image: never carry the previous song's bitmap (or its state) over.
+    key(url) { CoverFor(url, title, modifier, decorative) }
+}
+
+@Composable
+private fun CoverFor(url: String?, title: String, modifier: Modifier, decorative: Boolean) {
     val loader = LocalCoverLoader.current
     val cached = url?.let(CoverCache::get)
     val image by produceState(cached, url) {
@@ -121,8 +131,8 @@ internal fun Cover(url: String?, title: String, modifier: Modifier = Modifier, d
     Box(modifier.clip(MaterialTheme.shapes.extraSmall).background(MaterialTheme.colorScheme.surfaceContainerHighest)
         .semantics { if (description != null) { contentDescription = description; role = Role.Image } }) {
         Crossfade(image, label = "cover", animationSpec = if (reduce || cached != null) snap() else tween(220)) { bitmap ->
-            if (bitmap != null) Image(bitmap, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            else Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (bitmap != null) Image(bitmap, null, Modifier.fillMaxSize().testTag(COVER_IMAGE_TAG), contentScale = ContentScale.Crop)
+            else Box(Modifier.fillMaxSize().testTag(COVER_PLACEHOLDER_TAG), contentAlignment = Alignment.Center) {
                 Icon(YouSongIcons.MusicNote, null, Modifier.fillMaxSize(0.38f).widthIn(max = 48.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
             }
