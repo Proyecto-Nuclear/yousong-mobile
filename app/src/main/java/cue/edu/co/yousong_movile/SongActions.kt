@@ -13,6 +13,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** One in-memory coordinator per visible participant session; no credential persistence. */
+/** The venue closed the night: the end screen titles this case differently. */
+internal const val SESSION_CLOSED_NOTICE = "El local cerró la sesión de esta noche."
+
+/** One finished mutation: a new instance per result so repeated identical notices still show. */
+internal class ActionOutcome(val message: String?, val result: SupportResult?)
+
 internal class SongActions(
     private val api: ParticipantApi,
     session: ParticipantSession,
@@ -44,6 +50,9 @@ internal class SongActions(
     var error by mutableStateOf<String?>(null)
         private set
     var notice by mutableStateOf<String?>(null)
+        private set
+    /** Read-only mirror of [notice] with the server result, so the UI can name the song. */
+    var outcome by mutableStateOf<ActionOutcome?>(null)
         private set
 
     fun refresh() {
@@ -88,7 +97,7 @@ internal class SongActions(
                 active = false
                 ready = false
                 flow.invalidate()
-                onEnded("La sesión del local terminó.")
+                onEnded(SESSION_CLOSED_NOTICE)
             }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {
@@ -136,7 +145,7 @@ internal class SongActions(
                     active = false
                     ready = false
                     flow.invalidate()
-                    onEnded("La sesión del local terminó.")
+                    onEnded(SESSION_CLOSED_NOTICE)
                 }
             }
         } catch (cancelled: CancellationException) { throw cancelled }
@@ -176,14 +185,18 @@ internal class SongActions(
                         if (!available) return@withLock
                         val result = action()
                         currentCoroutineContext().ensureActive()
-                        if (flow.owns(ticket)) notice = if (result.created) "Solicitud aceptada con tu primer voto." else "Voto registrado."
+                        if (flow.owns(ticket)) {
+                            notice = if (result.created) "Solicitud aceptada con tu primer voto." else "Voto registrado."
+                            outcome = ActionOutcome(notice, result)
+                        }
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: Exception) {
                         if (flow.owns(ticket)) {
                             if (failure is ApiFailure && failure.status < 500) {
                                 notice = errorLabel(failure)
                                 if (failure.status == 401) handleFailure(failure)
-                            } else notice = "No se pudo confirmar el resultado. La acción pudo ser aceptada y no se puede deshacer aquí. Actualiza la cola antes de repetir."
+                            } else notice = "No pudimos confirmar tu acción. Puede que sí se haya registrado: revisa la cola antes de intentarlo de nuevo."
+                            outcome = ActionOutcome(notice, null)
                         }
                     } finally { flow.finishMutation(ticket) }
                     // No retries: reconcile even after conflicts or an uncertain result.
