@@ -161,19 +161,19 @@ internal class SongActions(
         return active && available && ready && !pending && value.state == ServiceState.ABIERTO && (!exists || voted == false)
     }
 
-    fun request(song: Song) {
-        if (canRequest(song)) mutate { api.requestSong(token, song.videoId) }
-    }
+    /** Returns false when the gate refused the tap (for example mid-poll); nothing was sent. */
+    fun request(song: Song): Boolean = canRequest(song) && mutate { api.requestSong(token, song.videoId) }
 
     fun canSupport(voted: Boolean?): Boolean = available && ready && canVote(snapshot?.state, voted, pending)
 
-    fun vote(requestId: String, voted: Boolean?) {
-        if (available && ready && canVote(snapshot?.state, voted, pending)) mutate { api.vote(token, requestId) }
-    }
+    /** Returns false when the gate refused the tap (for example mid-poll); nothing was sent. */
+    fun vote(requestId: String, voted: Boolean?): Boolean =
+        available && ready && canVote(snapshot?.state, voted, pending) && mutate { api.vote(token, requestId) }
 
-    private fun mutate(action: suspend () -> SupportResult) {
-        if (!available || !active) return
-        val ticket = flow.beginMutation() ?: return
+    /** True only when a mutation was actually started. */
+    private fun mutate(action: suspend () -> SupportResult): Boolean {
+        if (!available || !active) return false
+        val ticket = flow.beginMutation() ?: return false
         pending = true
         ready = false
         notice = null
@@ -206,6 +206,7 @@ internal class SongActions(
                 }
             } finally { pending = false }
         }
+        return true
     }
 
     private fun handleFailure(failure: Exception) {
