@@ -3,7 +3,7 @@ package cue.edu.co.yousong_movile
 import java.net.URLEncoder
 import org.json.JSONObject
 
-enum class ServiceState { ABIERTO, PAUSADO, CERRADO }
+enum class ServiceState { ABIERTO, PAUSADO, CERRADO, MANTENIMIENTO, UNKNOWN }
 data class QueueSong(val videoId: String, val title: String, val artist: String, val verified: Boolean,
     val durationSeconds: Int?, val thumbnailUrl: String?)
 data class QueueItem(val requestId: String, val position: Int, val votes: Long, val song: QueueSong,
@@ -32,7 +32,7 @@ internal fun parseQueue(json: JSONObject): QueueSnapshot {
         PlayingSong(it.nullableString("solicitudId"), parseQueueSong(it.getJSONObject("cancion")),
             it.getString("iniciadaAt"), it.getLong("restanteSegundos"), it.optionalVote())
     }
-    return QueueSnapshot(json.getLong("colaVersion"), ServiceState.valueOf(json.getString("estado")), playing,
+    return QueueSnapshot(json.getLong("colaVersion"), ServiceState.entries.firstOrNull { it.name == json.getString("estado") } ?: ServiceState.UNKNOWN, playing,
         List(items.length()) { index -> items.getJSONObject(index).let {
             QueueItem(it.getString("solicitudId"), it.getInt("posicion"), it.getLong("votos"),
                 parseQueueSong(it.getJSONObject("cancion")), it.getLong("esperaEstimadaSegundos"), it.optionalVote())

@@ -13,6 +13,12 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /** One in-memory coordinator per visible participant session; no credential persistence. */
+/** The venue closed the night: the end screen titles this case differently. */
+internal const val SESSION_CLOSED_NOTICE = "El local cerró la sesión de esta noche."
+
+/** One finished mutation: a new instance per result so repeated identical notices still show. */
+internal class ActionOutcome(val message: String?, val result: SupportResult?)
+
 internal class SongActions(
     private val api: ParticipantApi,
     session: ParticipantSession,
@@ -20,6 +26,10 @@ internal class SongActions(
     private val onEnded: (String?) -> Unit
 ) {
     private val token = session.token
+    private val readiness = SessionReadiness(session.qrSlug)
+    var availabilityMessage by mutableStateOf(readiness.label)
+        private set
+    private var available by mutableStateOf(false)
     var status by mutableStateOf(SessionStatus(session.name, session.pseudonym, session.service))
         private set
     var statusError by mutableStateOf<String?>(null)
@@ -41,10 +51,22 @@ internal class SongActions(
         private set
     var notice by mutableStateOf<String?>(null)
         private set
+    /** Read-only mirror of [notice] with the server result, so the UI can name the song. */
+    var outcome by mutableStateOf<ActionOutcome?>(null)
+        private set
 
-    fun refresh() { if (active) refreshes.trySend(Unit) }
+    fun refresh() {
+        if (active) {
+            ready = false; available = false
+            readiness.unavailable()
+            availabilityMessage = readiness.label
+            refreshes.trySend(Unit)
+        }
+    }
     fun dispose() {
         active = false
+        ready = false; available = false
+        readiness.unavailable()
         flow.invalidate()
         mutationJob?.cancel()
         refreshes.close()
@@ -54,6 +76,7 @@ internal class SongActions(
         while (active) {
             transport.withLock {
                 readStatus()
+                readAvailability()
                 readQueue()
             }
             if (!active) return
@@ -63,6 +86,7 @@ internal class SongActions(
 
     private suspend fun readStatus() {
         if (!active) return
+        available = false
         try {
             val latest = api.status(token)
             currentCoroutineContext().ensureActive()
@@ -73,7 +97,7 @@ internal class SongActions(
                 active = false
                 ready = false
                 flow.invalidate()
-                onEnded("La sesión del local terminó.")
+                onEnded(SESSION_CLOSED_NOTICE)
             }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {
@@ -84,8 +108,30 @@ internal class SongActions(
         }
     }
 
+    private suspend fun readAvailability() {
+        if (!active) return
+        readiness.unavailable()
+        available = false
+        val slug = readiness.slug
+        if (slug != null) {
+            try {
+                val latest = api.establishment(slug)
+                currentCoroutineContext().ensureActive()
+                if (!active) return
+                readiness.accept(latest)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                // This is a public lookup, not participant authentication: never erase the credential.
+                readiness.unavailable()
+            }
+        }
+        availabilityMessage = readiness.label
+    }
+
     private suspend fun readQueue() {
         if (!active) return
+        ready = false
+        available = false
         loading = true
         try {
             val latest = api.queue(token)
@@ -93,12 +139,13 @@ internal class SongActions(
             if (flow.accept(latest)) {
                 snapshot = latest
                 ready = true
+                available = statusError == null && readiness.canAct(latest.state, status.service)
                 error = null
                 if (latest.state == ServiceState.CERRADO) {
                     active = false
                     ready = false
                     flow.invalidate()
-                    onEnded("La sesión del local terminó.")
+                    onEnded(SESSION_CLOSED_NOTICE)
                 }
             }
         } catch (cancelled: CancellationException) { throw cancelled }
@@ -111,19 +158,22 @@ internal class SongActions(
         val voted = value.items.firstOrNull { it.song.videoId == song.videoId }?.voted
             ?: value.playing?.takeIf { it.song.videoId == song.videoId }?.voted
         val exists = value.items.any { it.song.videoId == song.videoId } || value.playing?.song?.videoId == song.videoId
-        return active && ready && !pending && value.state == ServiceState.ABIERTO && (!exists || voted == false)
+        return active && available && ready && !pending && value.state == ServiceState.ABIERTO && (!exists || voted == false)
     }
 
-    fun request(song: Song) {
-        if (canRequest(song)) mutate { api.requestSong(token, song.videoId) }
-    }
+    /** Returns false when the gate refused the tap (for example mid-poll); nothing was sent. */
+    fun request(song: Song): Boolean = canRequest(song) && mutate { api.requestSong(token, song.videoId) }
 
-    fun vote(requestId: String, voted: Boolean?) {
-        if (ready && canVote(snapshot?.state, voted, pending)) mutate { api.vote(token, requestId) }
-    }
+    fun canSupport(voted: Boolean?): Boolean = available && ready && canVote(snapshot?.state, voted, pending)
 
-    private fun mutate(action: suspend () -> SupportResult) {
-        val ticket = flow.beginMutation() ?: return
+    /** Returns false when the gate refused the tap (for example mid-poll); nothing was sent. */
+    fun vote(requestId: String, voted: Boolean?): Boolean =
+        available && ready && canVote(snapshot?.state, voted, pending) && mutate { api.vote(token, requestId) }
+
+    /** True only when a mutation was actually started. */
+    private fun mutate(action: suspend () -> SupportResult): Boolean {
+        if (!available || !active) return false
+        val ticket = flow.beginMutation() ?: return false
         pending = true
         ready = false
         notice = null
@@ -132,23 +182,31 @@ internal class SongActions(
                 transport.withLock {
                     if (!flow.owns(ticket)) return@withLock
                     try {
+                        if (!available) return@withLock
                         val result = action()
                         currentCoroutineContext().ensureActive()
-                        if (flow.owns(ticket)) notice = if (result.created) "Solicitud aceptada con tu primer voto." else "Voto registrado."
+                        if (flow.owns(ticket)) {
+                            notice = if (result.created) "Solicitud aceptada con tu primer voto." else "Voto registrado."
+                            outcome = ActionOutcome(notice, result)
+                        }
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (failure: Exception) {
                         if (flow.owns(ticket)) {
                             if (failure is ApiFailure && failure.status < 500) {
                                 notice = errorLabel(failure)
                                 if (failure.status == 401) handleFailure(failure)
-                            } else notice = "No se pudo confirmar el resultado. La acción pudo ser aceptada y no se puede deshacer aquí. Actualiza la cola antes de repetir."
+                            } else notice = "No pudimos confirmar tu acción. Puede que sí se haya registrado: revisa la cola antes de intentarlo de nuevo."
+                            outcome = ActionOutcome(notice, null)
                         }
                     } finally { flow.finishMutation(ticket) }
                     // No retries: reconcile even after conflicts or an uncertain result.
+                    readStatus()
+                    readAvailability()
                     readQueue()
                 }
             } finally { pending = false }
         }
+        return true
     }
 
     private fun handleFailure(failure: Exception) {

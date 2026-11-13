@@ -38,7 +38,8 @@ class KeystoreSessionStore(context: Context) : SessionRecordStore {
             require(ClientContract.apiBase(origin, BuildConfig.DEBUG) == origin)
             val json = JSONObject(String(cipher.decrypt(input.readBytes(), origin), Charsets.UTF_8))
             origin to ParticipantSession(json.getString("token"), json.getString("expiresAt"),
-                json.getString("pseudonym"), json.getString("name"), json.getString("service"))
+                json.getString("pseudonym"), json.getString("name"), json.getString("service"),
+                validatedQrSlug(json.opt("qrSlug")))
         }
     }
 
@@ -46,6 +47,7 @@ class KeystoreSessionStore(context: Context) : SessionRecordStore {
         require(ClientContract.apiBase(origin, BuildConfig.DEBUG) == origin)
         val payload = JSONObject().put("token", session.token).put("expiresAt", session.expiresAt)
             .put("pseudonym", session.pseudonym).put("name", session.name).put("service", session.service)
+            .apply { validatedQrSlug(session.qrSlug)?.let { put("qrSlug", it) } }
             .toString().toByteArray(Charsets.UTF_8)
         val encrypted = try { cipher.encrypt(payload, origin) } finally { payload.fill(0) }
         val stream = file.startWrite()
