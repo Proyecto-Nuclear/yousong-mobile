@@ -56,7 +56,7 @@ private fun QueueSongCard(song: QueueSong, content: @Composable ColumnScope.() -
 @Composable
 private fun VoteButton(actions: SongActions, id: String, voted: Boolean?, position: Int?) {
     Button(onClick = { actions.vote(id, voted) },
-        enabled = actions.ready && canVote(actions.snapshot?.state, voted, actions.pending),
+        enabled = actions.canSupport(voted),
         modifier = Modifier.heightIn(min = 48.dp)) {
         Text(when {
             voted == true -> "Ya votaste"

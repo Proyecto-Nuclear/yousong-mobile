@@ -20,6 +20,10 @@ internal class SongActions(
     private val onEnded: (String?) -> Unit
 ) {
     private val token = session.token
+    private val readiness = SessionReadiness(session.qrSlug)
+    var availabilityMessage by mutableStateOf(readiness.label)
+        private set
+    private var available by mutableStateOf(false)
     var status by mutableStateOf(SessionStatus(session.name, session.pseudonym, session.service))
         private set
     var statusError by mutableStateOf<String?>(null)
@@ -42,9 +46,18 @@ internal class SongActions(
     var notice by mutableStateOf<String?>(null)
         private set
 
-    fun refresh() { if (active) refreshes.trySend(Unit) }
+    fun refresh() {
+        if (active) {
+            ready = false; available = false
+            readiness.unavailable()
+            availabilityMessage = readiness.label
+            refreshes.trySend(Unit)
+        }
+    }
     fun dispose() {
         active = false
+        ready = false; available = false
+        readiness.unavailable()
         flow.invalidate()
         mutationJob?.cancel()
         refreshes.close()
@@ -54,6 +67,7 @@ internal class SongActions(
         while (active) {
             transport.withLock {
                 readStatus()
+                readAvailability()
                 readQueue()
             }
             if (!active) return
@@ -63,6 +77,7 @@ internal class SongActions(
 
     private suspend fun readStatus() {
         if (!active) return
+        available = false
         try {
             val latest = api.status(token)
             currentCoroutineContext().ensureActive()
@@ -84,8 +99,30 @@ internal class SongActions(
         }
     }
 
+    private suspend fun readAvailability() {
+        if (!active) return
+        readiness.unavailable()
+        available = false
+        val slug = readiness.slug
+        if (slug != null) {
+            try {
+                val latest = api.establishment(slug)
+                currentCoroutineContext().ensureActive()
+                if (!active) return
+                readiness.accept(latest)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                // This is a public lookup, not participant authentication: never erase the credential.
+                readiness.unavailable()
+            }
+        }
+        availabilityMessage = readiness.label
+    }
+
     private suspend fun readQueue() {
         if (!active) return
+        ready = false
+        available = false
         loading = true
         try {
             val latest = api.queue(token)
@@ -93,6 +130,7 @@ internal class SongActions(
             if (flow.accept(latest)) {
                 snapshot = latest
                 ready = true
+                available = statusError == null && readiness.canAct(latest.state, status.service)
                 error = null
                 if (latest.state == ServiceState.CERRADO) {
                     active = false
@@ -111,18 +149,21 @@ internal class SongActions(
         val voted = value.items.firstOrNull { it.song.videoId == song.videoId }?.voted
             ?: value.playing?.takeIf { it.song.videoId == song.videoId }?.voted
         val exists = value.items.any { it.song.videoId == song.videoId } || value.playing?.song?.videoId == song.videoId
-        return active && ready && !pending && value.state == ServiceState.ABIERTO && (!exists || voted == false)
+        return active && available && ready && !pending && value.state == ServiceState.ABIERTO && (!exists || voted == false)
     }
 
     fun request(song: Song) {
         if (canRequest(song)) mutate { api.requestSong(token, song.videoId) }
     }
 
+    fun canSupport(voted: Boolean?): Boolean = available && ready && canVote(snapshot?.state, voted, pending)
+
     fun vote(requestId: String, voted: Boolean?) {
-        if (ready && canVote(snapshot?.state, voted, pending)) mutate { api.vote(token, requestId) }
+        if (available && ready && canVote(snapshot?.state, voted, pending)) mutate { api.vote(token, requestId) }
     }
 
     private fun mutate(action: suspend () -> SupportResult) {
+        if (!available || !active) return
         val ticket = flow.beginMutation() ?: return
         pending = true
         ready = false
@@ -132,6 +173,7 @@ internal class SongActions(
                 transport.withLock {
                     if (!flow.owns(ticket)) return@withLock
                     try {
+                        if (!available) return@withLock
                         val result = action()
                         currentCoroutineContext().ensureActive()
                         if (flow.owns(ticket)) notice = if (result.created) "Solicitud aceptada con tu primer voto." else "Voto registrado."
@@ -145,6 +187,8 @@ internal class SongActions(
                         }
                     } finally { flow.finishMutation(ticket) }
                     // No retries: reconcile even after conflicts or an uncertain result.
+                    readStatus()
+                    readAvailability()
                     readQueue()
                 }
             } finally { pending = false }

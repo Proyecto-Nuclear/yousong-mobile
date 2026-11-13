@@ -21,7 +21,7 @@ object ClientContract {
         val text = input.trim().trimEnd('/')
         val uri = runCatching { URI(text) }.getOrNull() ?: return null
         return text.takeIf {
-            (uri.scheme == "https" || (debug && text in setOf("http://10.0.2.2:8080", "http://192.168.1.21:8080"))) && uri.host != null && uri.userInfo == null &&
+            (uri.scheme == "https" || (debug && text in setOf("http://10.0.2.2:8080", "http://192.168.1.21:8080", "http://127.0.0.1:8080"))) && uri.host != null && uri.userInfo == null &&
                 uri.rawQuery == null && uri.rawFragment == null && uri.rawPath.isNullOrEmpty()
         }
     }
@@ -33,11 +33,13 @@ object ClientContract {
     private fun encode(value: String) = URLEncoder.encode(value, "UTF-8")
 }
 
-data class Establishment(val name: String, val slug: String, val service: String, val canJoin: Boolean)
+data class Establishment(val name: String, val slug: String, val service: String, val canJoin: Boolean,
+    val nextOpening: String? = null)
 data class Purpose(val code: String, val description: String)
 data class PrivacyPolicy(val version: String, val purposes: List<Purpose>)
 // Deliberately not a data class: generated toString must never expose credentials.
-class ParticipantSession(val token: String, val expiresAt: String, val pseudonym: String, val name: String, val service: String)
+class ParticipantSession(val token: String, val expiresAt: String, val pseudonym: String, val name: String,
+    val service: String, val qrSlug: String? = null)
 data class SessionStatus(val name: String, val pseudonym: String, val service: String)
 data class Song(
     val videoId: String, val title: String, val artist: String, val verified: Boolean,

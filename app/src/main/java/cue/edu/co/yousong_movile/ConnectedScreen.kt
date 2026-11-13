@@ -42,7 +42,11 @@ private fun ConnectedSessionScreen(api: ParticipantApi, session: ParticipantSess
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("YouSong", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 12.dp))
             Text(status.name, style = MaterialTheme.typography.headlineMedium)
-            Text("${status.pseudonym} · ${status.service}")
+            Text("${status.pseudonym} · Sesión: ${status.service}")
+            Text(actions.availabilityMessage)
+            TextButton(onClick = actions::refresh, enabled = !actions.loading && !actions.pending) {
+                Text("Actualizar estado del local")
+            }
             (leaveError ?: actions.statusError)?.let {
                 Text(it, color = MaterialTheme.colorScheme.error)
                 TextButton(onClick = { leaveError = null; actions.refresh() }) { Text("Reintentar estado") }

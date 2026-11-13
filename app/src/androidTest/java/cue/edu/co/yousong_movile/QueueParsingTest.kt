@@ -28,6 +28,21 @@ class QueueParsingTest {
         assertNull(result.items[0].song.thumbnailUrl)
     }
 
+    @Test fun maintenanceSnapshotPreservesNullableDefaultListPlaybackWithoutInventingAVote() {
+        val result = parseQueue(JSONObject("""{"colaVersion":11,"estado":"MANTENIMIENTO",
+          "enReproduccion":{"solicitudId":null,"origen":"DEFECTO","cancion":$song,
+          "iniciadaAt":"2026-06-01T00:00:00Z","restanteSegundos":45},"cola":[]}"""))
+        assertEquals("MANTENIMIENTO", result.state.name)
+        val playing = requireNotNull(result.playing)
+        assertNull(playing.requestId)
+        assertNull(playing.voted)
+        assertNull(playing.song.durationSeconds)
+        assertNull(playing.song.thumbnailUrl)
+        assertEquals(45L, playing.remainingSeconds)
+        assertTrue(result.items.isEmpty())
+        assertFalse(canVote(result.state, playing.voted, false))
+    }
+
     @Test fun missingParticipantVoteIsUnknownNotFalse() {
         val result = parseQueue(JSONObject("""{"colaVersion":1,"estado":"PAUSADO","enReproduccion":null,
           "cola":[{"solicitudId":"r","posicion":1,"votos":0,"cancion":$song,"esperaEstimadaSegundos":0}]}"""))

@@ -12,8 +12,9 @@ class ApiFailure(val status: Int, val code: String) : Exception("API request fai
 class ParticipantApi(private val base: String) {
     init { require(ClientContract.apiBase(base, BuildConfig.DEBUG) != null) }
 
-    suspend fun establishment(slug: String): Establishment = request("/api/public/establecimientos/$slug").let {
-        Establishment(it.getString("nombre"), it.getString("qrSlug"), it.getString("servicio"), it.getBoolean("puedeParticipar"))
+    suspend fun establishment(slug: String): Establishment {
+        require(validatedQrSlug(slug) != null)
+        return parseEstablishment(request("/api/public/establecimientos/$slug"))
     }
 
     suspend fun policy(): PrivacyPolicy = request("/api/public/politica").let { json ->
@@ -24,12 +25,13 @@ class ParticipantApi(private val base: String) {
     }
 
     suspend fun join(slug: String, policy: PrivacyPolicy, f1: Boolean, f2: Boolean): ParticipantSession {
+        require(validatedQrSlug(slug) != null)
         require(f1 && policy.version.isNotBlank() && policy.version.length <= 20)
         val body = JSONObject().put("canal", "ANDROID").put("politicaVersion", policy.version)
             .put("autorizaF1", f1).put("autorizaF2", f2)
         return request("/api/public/establecimientos/$slug/participaciones", "POST", body = body).let {
             ParticipantSession(it.getString("token"), it.getString("expiraAt"), it.getString("seudonimo"),
-                it.getJSONObject("establecimiento").getString("nombre"), it.getString("servicio"))
+                it.getJSONObject("establecimiento").getString("nombre"), it.getString("servicio"), slug)
         }
     }
 
@@ -89,6 +91,11 @@ class ParticipantApi(private val base: String) {
         }
 }
 
+internal fun parseEstablishment(json: JSONObject): Establishment = Establishment(
+    json.getString("nombre"), requireNotNull(validatedQrSlug(json.get("qrSlug"))),
+    json.getString("servicio"), json.getBoolean("puedeParticipar"),
+    (json.opt("proximaApertura") as? String)?.takeIf { expiresAtMillis(it) != null })
+
 internal fun parseSearch(json: JSONObject): SearchPage {
     val results = json.getJSONArray("resultados")
     return SearchPage(List(results.length()) { index ->
@@ -117,6 +124,12 @@ fun errorLabel(error: Exception): String = when {
     error is ApiFailure && error.code == "REQUEST_NOT_FOUND" -> "La solicitud no se encontró en esta sesión. Actualiza la cola."
     error is ApiFailure && error.code == "INVALID_VIDEO_ID" -> "La canción no tiene un identificador válido."
     error is ApiFailure && (error.status == 502 || error.status == 503) -> "El proveedor de música no está disponible o su cuota se agotó. Inténtalo más tarde."
+    error is ApiFailure && error.code == "ESTABLISHMENT_IN_MAINTENANCE" -> "El local está en mantenimiento. Espera a que el personal habilite el servicio y actualiza el estado."
+    error is ApiFailure && error.code == "ESTABLISHMENT_PAUSED" -> "El local está pausado. Espera a que el personal reanude el servicio y actualiza el estado."
+    error is ApiFailure && error.code == "SESSION_PAUSED" -> "La sesión está pausada. Puedes consultar la cola; espera a que el personal la reanude."
+    error is ApiFailure && error.code == "OUTSIDE_SCHEDULE" -> "El local está fuera de horario. Consulta la próxima apertura y actualiza el estado antes de ingresar."
+    error is ApiFailure && error.code == "NO_ACTIVE_SESSION" -> "El local aún no tiene una sesión abierta. Espera a que el personal la abra y actualiza el estado."
+    error is ApiFailure && error.code == "SESSION_NOT_ACCEPTING" -> "La sesión no admite solicitudes ni votos ahora. Actualiza el estado; puedes seguir consultando la cola."
     error is ApiFailure && error.status == 409 -> "El servicio no admite esta acción ahora. Actualiza el estado del local."
     error is ApiFailure && error.status == 404 -> "No se encontró el establecimiento. Revisa el enlace."
     else -> "No se pudo conectar al servicio. Revisa la dirección y la conexión e inténtalo de nuevo."

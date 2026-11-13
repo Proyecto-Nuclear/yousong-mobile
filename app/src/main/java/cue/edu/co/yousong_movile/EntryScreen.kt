@@ -19,6 +19,7 @@ import kotlinx.coroutines.launch
 internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoined: (ParticipantSession) -> Unit) {
     var establishment by remember { mutableStateOf<Establishment?>(null) }
     var policy by remember { mutableStateOf<PrivacyPolicy?>(null) }
+    var fresh by remember { mutableStateOf(false) }
     var f1 by remember { mutableStateOf(false) }
     var f2 by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -31,7 +32,7 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
     val scope = rememberCoroutineScope()
     var request by remember { mutableStateOf<Job?>(null) }
     fun clearConsent() {
-        establishment = null; policy = null; f1 = false; f2 = false
+        establishment = null; policy = null; f1 = false; f2 = false; fresh = false
     }
     // Keep result launchers registered while the external camera activity covers this screen.
     // Stopped/disposed requests lose ownership even if blocking HTTP finishes later.
@@ -60,27 +61,32 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
             error = "Permiso de cámara denegado. Habilítalo en los ajustes para escanear el QR."
         }
     }
-    LaunchedEffect(scanned, active) {
-        val slug = scanned ?: return@LaunchedEffect
-        if (!active) return@LaunchedEffect
-        scanned = null
-        val ticket = flow.begin() ?: return@LaunchedEffect
-        clearConsent()
-        if (origin == null) {
-            flow.finish(ticket)
-            return@LaunchedEffect
-        }
+    fun lookup(slug: String, newScan: Boolean) {
+        if (!active || origin == null) return
+        val ticket = flow.begin() ?: return
+        if (newScan) clearConsent()
+        fresh = false
         busy = true; error = null
         request = scope.launch {
             try {
                 val api = ParticipantApi(origin)
                 val place = api.establishment(slug)
+                require(place.slug == slug)
                 val privacy = api.policy()
-                if (flow.owns(ticket)) { establishment = place; policy = privacy }
+                if (flow.owns(ticket)) {
+                    if (!retainsConsent(policy, privacy)) { f1 = false; f2 = false }
+                    establishment = place; policy = privacy; fresh = true
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) { if (flow.owns(ticket)) error = entryErrorLabel(failure) }
             finally { if (flow.finish(ticket)) busy = false }
         }
+    }
+    LaunchedEffect(scanned, active) {
+        val slug = scanned ?: return@LaunchedEffect
+        if (!active) return@LaunchedEffect
+        scanned = null
+        lookup(slug, newScan = true)
     }
     Column(Modifier.safeDrawingPadding().fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -117,15 +123,19 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(place.name, style = MaterialTheme.typography.headlineSmall)
                     Text("Servicio: ${place.service}")
-                    if (!place.canJoin) Text("El local no admite participantes en este momento. Vuelve a escanear para consultar su estado.")
+                    Text(availabilityLabel(place))
+                    TextButton(enabled = active && !busy, onClick = { lookup(place.slug, newScan = false) }) {
+                        Text("Actualizar estado del local")
+                    }
+                    if (!fresh) Text("Actualiza el estado antes de ingresar. Tu consentimiento no se selecciona automáticamente.")
                     Text("Privacidad · versión ${privacy.version}", style = MaterialTheme.typography.titleMedium)
                     privacy.purposes.forEach { purpose -> Text("${purpose.code}: ${purpose.description}") }
                     Text("F1 permite operar la sesión musical y es obligatorio. F2 permite comentarios voluntarios sobre usabilidad y es opcional. Tú decides antes de ingresar.")
                     ConsentRow(f1, !busy, "Autorizo F1: participación en la sesión (obligatorio)") { f1 = it }
                     ConsentRow(f2, !busy, "Autorizo F2: comentarios de usabilidad (opcional)") { f2 = it }
-                    Button(modifier = Modifier.fillMaxWidth(), enabled = active && !busy && place.canJoin && f1,
+                    Button(modifier = Modifier.fillMaxWidth(), enabled = active && !busy && fresh && canParticipate(place) && f1,
                         onClick = {
-                            if (f1 && place.canJoin && !busy && origin != null) {
+                            if (f1 && fresh && canParticipate(place) && !busy && origin != null) {
                                 val ticket = flow.begin()
                                 if (ticket != null) {
                                     busy = true; joining = true; error = null
@@ -137,6 +147,7 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
                                         catch (failure: Exception) {
                                             if (flow.owns(ticket)) {
                                                 error = entryErrorLabel(failure)
+                                                fresh = false
                                                 // A changed policy always requires a new lookup and explicit consent.
                                                 if (failure is ApiFailure && failure.code == "POLICY_VERSION_MISMATCH") clearConsent()
                                             }

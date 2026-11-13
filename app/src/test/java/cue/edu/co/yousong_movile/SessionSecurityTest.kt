@@ -25,6 +25,16 @@ class SessionSecurityTest {
         assertEquals("https://api.example", ClientContract.apiBase("https://api.example/", debug = true))
         assertEquals("sala-azul", ClientContract.slug("https://untrusted.example/s/sala-azul"))
     }
+    @Test fun pairedPhoneLoopbackIsDebugOnlyAndNeverBroadensLocalHttp() {
+        val loopback = "http://127.0.0.1:8080"
+        assertEquals(loopback, ClientContract.apiBase(loopback, debug = true))
+        assertNull(ClientContract.apiBase(loopback, debug = false))
+        listOf("http://127.0.0.1:8081", "http://127.0.0.2:8080", "http://localhost:8080",
+            "http://127.0.0.1:8080/api", "http://user:pass@127.0.0.1:8080",
+            "http://127.0.0.1:8080?x=1", "http://127.0.0.1:8080#fragment").forEach {
+            assertNull(ClientContract.apiBase(it, debug = true))
+        }
+    }
     @Test fun joinedSessionRestoresWithItsOriginalApiOrigin() {
         val store = Store(); val lifecycle = SessionLifecycle(store) { 0 }
         val session = session()
