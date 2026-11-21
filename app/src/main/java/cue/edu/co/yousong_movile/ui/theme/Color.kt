@@ -8,137 +8,163 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 /*
- * YouSong palette. Dark is the first-class look from the team prototype: a night-bar
- * ground, sage for actions, and one cool "live" blue reserved for what is happening now
- * (the head of the queue, focus). Planes are separated by container steps, never shadows.
+ * "Noche de verbena": the violet night of a Colombian street party, lit by mango paper lanterns,
+ * with one aqua glow reserved for what is happening now (the song playing, the head of the queue,
+ * focus). Dark is the first-class look. Planes are separated by container steps, never shadows.
  * Every Material 3 role is defined so no baseline purple can leak through.
+ * Contrast ratios for every pair are listed in the README.
  */
 
 // Dark tokens
-private val NightGround = Color(0xFF0E0F0E)
-private val NightSurface = Color(0xFF171917)
-private val NightRaised = Color(0xFF222522)
-private val NightOutline = Color(0xFF6B716A)
-private val NightHairline = Color(0xFF2A2E29)
-private val Bone = Color(0xFFF2F4EE)
-private val BoneMuted = Color(0xFFB3B8AD)
-private val Sage = Color(0xFFCBDDB0)
-private val OnSage = Color(0xFF172012)
-private val LiveBlue = Color(0xFFB8D8FF)
+private val Night = Color(0xFF14101F)
+private val NightLowest = Color(0xFF0F0C18)
+private val NightLow = Color(0xFF19142A)
+private val NightSurface = Color(0xFF1E1830)
+private val NightHigh = Color(0xFF241D3A)
+private val NightRaised = Color(0xFF2A2243)
+private val NightHairline = Color(0xFF342B52)
+private val NightOutline = Color(0xFF8A7FB0)
+private val Moon = Color(0xFFF6F1FF)
+private val MoonMuted = Color(0xFFBDB4D6)
+private val Mango = Color(0xFFFFB547)
+private val OnMango = Color(0xFF1B1530)
+private val Aqua = Color(0xFF3DD6C6)
+private val Lilac = Color(0xFFC9B8FF)
 
 // Light tokens
-private val DayGround = Color(0xFFF1F4F1)
+private val Day = Color(0xFFF6F3FB)
 private val DaySurface = Color(0xFFFFFFFF)
-private val DayContainer = Color(0xFFE7ECE7)
-private val Ink = Color(0xFF161916)
-private val InkMuted = Color(0xFF4A5048)
-private val Forest = Color(0xFF2F4A2C)
-private val OnForest = Color(0xFFF2F6EE)
-private val DayOutline = Color(0xFF7A8177)
-private val DayLive = Color(0xFF1F5FBF)
+private val DayContainer = Color(0xFFECE6F6)
+private val Ink = Color(0xFF1B1530)
+private val InkMuted = Color(0xFF50476B)
+private val Violet = Color(0xFF5B3FD0)
+private val DayOutline = Color(0xFF7D7399)
+// The brief's #0B7F73 reaches only 4.45:1 on the light background; one step darker passes (5.0:1).
+private val DayLive = Color(0xFF09766B)
 
 internal val DarkColors: ColorScheme = darkColorScheme(
-    primary = Sage,
-    onPrimary = OnSage,
-    primaryContainer = Color(0xFF34432C),
-    onPrimaryContainer = Color(0xFFDDEBC8),
-    inversePrimary = Color(0xFF4A6440),
-    secondary = Color(0xFFC2C9B8),
-    onSecondary = Color(0xFF1E231B),
-    secondaryContainer = Color(0xFF2E342C),
-    onSecondaryContainer = Color(0xFFE1E8D6),
-    tertiary = LiveBlue,
-    onTertiary = Color(0xFF0A2540),
-    tertiaryContainer = Color(0xFF1C3550),
-    onTertiaryContainer = Color(0xFFD6E7FF),
-    background = NightGround,
-    onBackground = Bone,
+    primary = Mango,
+    onPrimary = OnMango,
+    primaryContainer = Color(0xFF4D3510),
+    onPrimaryContainer = Color(0xFFFFE2B8),
+    inversePrimary = Color(0xFF8A5A00),
+    secondary = Lilac,
+    onSecondary = Color(0xFF2A1C5E),
+    secondaryContainer = Color(0xFF3B3163),
+    onSecondaryContainer = Color(0xFFE9E1FF),
+    tertiary = Aqua,
+    onTertiary = Color(0xFF0B2B28),
+    tertiaryContainer = Color(0xFF0F3D3A),
+    onTertiaryContainer = Color(0xFFB6F5EC),
+    background = Night,
+    onBackground = Moon,
     surface = NightSurface,
-    onSurface = Bone,
+    onSurface = Moon,
     surfaceVariant = NightRaised,
-    onSurfaceVariant = BoneMuted,
+    onSurfaceVariant = MoonMuted,
     surfaceTint = Color.Transparent,
-    inverseSurface = Bone,
-    inverseOnSurface = Color(0xFF1B1D1B),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
-    errorContainer = Color(0xFF3B2323),
-    onErrorContainer = Color(0xFFFFDAD6),
+    inverseSurface = Moon,
+    inverseOnSurface = NightSurface,
+    error = Color(0xFFFF8F8F),
+    onError = Color(0xFF3A0A10),
+    errorContainer = Color(0xFF3A1F2B),
+    onErrorContainer = Color(0xFFFFD9DC),
     outline = NightOutline,
     outlineVariant = NightHairline,
-    scrim = Color(0xFF000000),
-    surfaceBright = Color(0xFF2A2E29),
-    surfaceDim = NightGround,
-    surfaceContainerLowest = Color(0xFF0A0B0A),
-    surfaceContainerLow = Color(0xFF131513),
+    scrim = Color(0xFF07050D),
+    surfaceBright = NightHairline,
+    surfaceDim = Night,
+    surfaceContainerLowest = NightLowest,
+    surfaceContainerLow = NightLow,
     surfaceContainer = NightSurface,
-    surfaceContainerHigh = Color(0xFF1C1F1C),
+    surfaceContainerHigh = NightHigh,
     surfaceContainerHighest = NightRaised,
 )
 
+/*
+ * Light keeps mango as the call-to-action fill ([YouSongExtras.cta]), but Material uses `primary`
+ * as a foreground color too (text buttons, progress, cursor, checkboxes), where mango on white is
+ * 1.6:1. So in light `primary` is the accent-text violet and mango lives in primaryContainer.
+ */
 internal val LightColors: ColorScheme = lightColorScheme(
-    primary = Forest,
-    onPrimary = OnForest,
-    primaryContainer = Color(0xFFD3E3C6),
-    onPrimaryContainer = Color(0xFF172012),
-    inversePrimary = Sage,
-    secondary = Color(0xFF56604F),
+    primary = Violet,
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Mango,
+    onPrimaryContainer = OnMango,
+    inversePrimary = Mango,
+    secondary = Violet,
     onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFDCE3D4),
-    onSecondaryContainer = Color(0xFF1A2117),
+    secondaryContainer = Color(0xFFE4DCFF),
+    onSecondaryContainer = Color(0xFF1F1248),
     tertiary = DayLive,
     onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFD8E4FA),
-    onTertiaryContainer = Color(0xFF0B2A5A),
-    background = DayGround,
+    tertiaryContainer = Color(0xFFD3F2EC),
+    onTertiaryContainer = Color(0xFF0B3D37),
+    background = Day,
     onBackground = Ink,
     surface = DaySurface,
     onSurface = Ink,
     surfaceVariant = DayContainer,
     onSurfaceVariant = InkMuted,
     surfaceTint = Color.Transparent,
-    inverseSurface = Color(0xFF2C312C),
-    inverseOnSurface = Color(0xFFEEF2EC),
+    inverseSurface = Color(0xFF2B2442),
+    inverseOnSurface = Moon,
     error = Color(0xFFB3261E),
     onError = Color(0xFFFFFFFF),
-    errorContainer = Color(0xFFF9DEDC),
+    errorContainer = Color(0xFFFADCE0),
     onErrorContainer = Color(0xFF410E0B),
     outline = DayOutline,
-    outlineVariant = Color(0xFFD3D9D1),
-    scrim = Color(0xFF000000),
+    outlineVariant = Color(0xFFDCD5EA),
+    scrim = Color(0xFF07050D),
     surfaceBright = DaySurface,
-    surfaceDim = Color(0xFFDCE1DB),
+    surfaceDim = Color(0xFFE2DCEE),
     surfaceContainerLowest = DaySurface,
-    surfaceContainerLow = Color(0xFFF7F9F6),
-    surfaceContainer = Color(0xFFEEF2EE),
+    surfaceContainerLow = Color(0xFFF9F7FD),
+    surfaceContainer = Color(0xFFF1ECF9),
     surfaceContainerHigh = DayContainer,
-    surfaceContainerHighest = Color(0xFFDFE5DF),
+    surfaceContainerHighest = Color(0xFFE4DDF1),
 )
 
-/** Roles Material 3 does not name: the live accent, success feedback and decorative hairlines. */
+/** Roles Material 3 does not name: the live accent, the mango CTA, success and decorative hairlines. */
 @Immutable
 data class YouSongExtras(
     val live: Color,
+    val cta: Color,
+    val onCta: Color,
     val success: Color,
     val onSuccess: Color,
     val hairline: Color,
     val coverScrim: Color,
+    /** Ink for anything drawn on a [GenreTileColors] tile (all tiles are light enough for it). */
+    val onTile: Color,
 )
 
 internal val DarkExtras = YouSongExtras(
-    live = LiveBlue,
-    success = Color(0xFF202D26),
-    onSuccess = Color(0xFFDAFFE6),
+    live = Aqua,
+    cta = Mango,
+    onCta = OnMango,
+    success = Color(0xFF17332F),
+    onSuccess = Color(0xFFCFF7EF),
     hairline = NightHairline,
-    coverScrim = Color(0xCC0E0F0E),
+    coverScrim = Color(0xCC14101F),
+    onTile = OnMango,
 )
 
 internal val LightExtras = YouSongExtras(
     live = DayLive,
-    success = Color(0xFFD9F2E1),
-    onSuccess = Color(0xFF0F3A20),
-    hairline = Color(0xFFD9DED8),
-    coverScrim = Color(0xCC161916),
+    cta = Mango,
+    onCta = OnMango,
+    success = Color(0xFFD3F2EC),
+    onSuccess = Color(0xFF0B3D37),
+    hairline = Color(0xFFDCD5EA),
+    coverScrim = Color(0xCC1B1530),
+    onTile = OnMango,
+)
+
+/** Festival tiles for "Explorar"; each carries #1B1530 text at 8.2:1 or better. */
+val GenreTileColors = listOf(
+    Mango, Aqua, Color(0xFFFF8FB8), Color(0xFFB9A6FF), Color(0xFFC6E86B), Color(0xFFFF9E7A),
+    Color(0xFF7CC8FF), Color(0xFFF2D49B),
 )
 
 val LocalYouSongExtras = staticCompositionLocalOf { DarkExtras }
