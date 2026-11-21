@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -45,27 +47,34 @@ internal fun SongDetail(song: Song, cta: SongCta, pending: Boolean, onAction: ()
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SongDetailContent(song: Song, cta: SongCta, pending: Boolean, onAction: () -> Unit) {
     // The action stays pinned under the scrolling details so it is always reachable.
     Column(Modifier.fillMaxWidth().padding(horizontal = Spacing.lg).padding(bottom = Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.readableWidth().weight(1f, fill = false).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(stringResource(R.string.detail_title), style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Box {
-                Cover(song.thumbnailUrl, song.title, Modifier.fillMaxWidth().aspectRatio(16f / 10f), decorative = false)
-                clockLabel(song.durationSeconds)?.let { DurationBadge(it, Modifier.align(Alignment.BottomStart).padding(Spacing.sm)) }
+            horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Cover(song.thumbnailUrl, song.title, Modifier.padding(top = Spacing.xs).fillMaxWidth(0.72f).widthIn(max = 280.dp)
+                .aspectRatio(1f), decorative = false, shape = MaterialTheme.shapes.large)
+            Spacer(Modifier.height(Spacing.sm))
+            Text(song.title, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { heading() })
+            Text(song.artist, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs, Alignment.CenterHorizontally),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                song.genre?.let { GenreChip(it) }
+                clockLabel(song.durationSeconds)?.let { clock ->
+                    val description = stringResource(R.string.duration_description, clock)
+                    Pill(clock, Modifier.semantics { contentDescription = description }, YouSongIcons.Schedule)
+                }
             }
-            Spacer(Modifier.height(Spacing.xxs))
-            Text(song.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
-            Text(songMeta(song.artist, song.durationSeconds), style = MaterialTheme.typography.titleMedium.tabular(),
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (!song.verified) Text(stringResource(R.string.unverified_artist_note), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.detail_how_it_works), style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = Spacing.xs))
         }
         SongCtaButton(cta, pending, onAction, Modifier.readableWidth().padding(top = Spacing.md))
     }
@@ -75,16 +84,16 @@ internal fun SongDetailContent(song: Song, cta: SongCta, pending: Boolean, onAct
 internal fun SongCtaButton(cta: SongCta, pending: Boolean, onAction: () -> Unit, modifier: Modifier = Modifier) {
     val height = Modifier.heightIn(min = 52.dp)
     when {
-        pending -> Button(onClick = {}, enabled = false, modifier = modifier.then(height)) {
+        pending -> CtaButton(onClick = {}, enabled = false, modifier = modifier) {
             CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
             Spacer(Modifier.width(Spacing.xs)); Text(stringResource(R.string.cta_pending))
         }
-        cta == SongCta.Request -> Button(onClick = onAction, modifier = modifier.then(height)) {
-            Text(stringResource(R.string.cta_request)); Spacer(Modifier.width(Spacing.xs))
-            Icon(YouSongIcons.Add, null, Modifier.size(18.dp))
+        cta == SongCta.Request -> CtaButton(onClick = onAction, modifier = modifier) {
+            Icon(YouSongIcons.Add, null, Modifier.size(20.dp)); Spacer(Modifier.width(Spacing.xs))
+            Text(stringResource(R.string.cta_request))
         }
-        cta == SongCta.Vote -> Button(onClick = onAction, modifier = modifier.then(height)) {
-            Icon(YouSongIcons.ArrowUp, null, Modifier.size(18.dp)); Spacer(Modifier.width(Spacing.xs))
+        cta == SongCta.Vote -> CtaButton(onClick = onAction, modifier = modifier) {
+            Icon(YouSongIcons.ArrowUp, null, Modifier.size(20.dp)); Spacer(Modifier.width(Spacing.xs))
             Text(stringResource(R.string.cta_vote))
         }
         cta == SongCta.Voted -> FilledTonalButton(onClick = {}, enabled = false, modifier = modifier.then(height),
@@ -113,13 +122,14 @@ internal const val COVER_PLACEHOLDER_TAG = "cover-placeholder"
 internal val LocalCoverLoader = staticCompositionLocalOf<suspend (String) -> ImageBitmap?> { { secureCover(it) } }
 
 @Composable
-internal fun Cover(url: String?, title: String, modifier: Modifier = Modifier, decorative: Boolean = true) {
+internal fun Cover(url: String?, title: String, modifier: Modifier = Modifier, decorative: Boolean = true,
+    shape: Shape = MaterialTheme.shapes.extraSmall) {
     // A new url is a new image: never carry the previous song's bitmap (or its state) over.
-    key(url) { CoverFor(url, title, modifier, decorative) }
+    key(url) { CoverFor(url, title, modifier, decorative, shape) }
 }
 
 @Composable
-private fun CoverFor(url: String?, title: String, modifier: Modifier, decorative: Boolean) {
+private fun CoverFor(url: String?, title: String, modifier: Modifier, decorative: Boolean, shape: Shape) {
     val loader = LocalCoverLoader.current
     val cached = url?.let(CoverCache::get)
     val image by produceState(cached, url) {
@@ -128,7 +138,7 @@ private fun CoverFor(url: String?, title: String, modifier: Modifier, decorative
     }
     val description = if (decorative) null else stringResource(R.string.cover_description, title)
     val reduce = LocalReduceMotion.current
-    Box(modifier.clip(MaterialTheme.shapes.extraSmall).background(MaterialTheme.colorScheme.surfaceContainerHighest)
+    Box(modifier.clip(shape).background(MaterialTheme.colorScheme.surfaceContainerHighest)
         .semantics { if (description != null) { contentDescription = description; role = Role.Image } }) {
         Crossfade(image, label = "cover", animationSpec = if (reduce || cached != null) snap() else tween(220)) { bitmap ->
             if (bitmap != null) Image(bitmap, null, Modifier.fillMaxSize().testTag(COVER_IMAGE_TAG), contentScale = ContentScale.Crop)

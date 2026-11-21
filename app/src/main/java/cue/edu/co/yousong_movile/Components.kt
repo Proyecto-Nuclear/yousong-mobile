@@ -61,9 +61,10 @@ internal fun ScreenTitle(title: String, subtitle: String?, modifier: Modifier = 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SectionHeader(title: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
-    FlowRow(modifier.fillMaxWidth().heightIn(min = Spacing.touch), horizontalArrangement = Arrangement.SpaceBetween,
+    // Only a trailing action needs the touch height; a bare heading keeps its note close.
+    FlowRow(modifier.fillMaxWidth().heightIn(min = if (trailing != null) Spacing.touch else 0.dp), horizontalArrangement = Arrangement.SpaceBetween,
         itemVerticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.semantics { heading() })
         trailing?.invoke()
     }
 }
@@ -105,9 +106,28 @@ internal fun ServiceStatePill(chip: ServiceChip, modifier: Modifier = Modifier) 
 internal fun votesLabel(votes: Long): String =
     pluralStringResource(R.plurals.votes_count, votes.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), votes)
 
+/** "Artista · Género · 3:34"; genre and duration are left out when unknown. */
+internal fun songMeta(artist: String, seconds: Int?, genre: String? = null): String = songMetaLine(artist, genre, seconds)
+
+/** The mango call to action. Every filled button in the app goes through here so light mode keeps mango. */
 @Composable
-internal fun songMeta(artist: String, seconds: Int?): String =
-    clockLabel(seconds)?.let { stringResource(R.string.meta_artist_duration, artist, it) } ?: artist
+internal fun CtaButton(onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true,
+    content: @Composable RowScope.() -> Unit) {
+    val extras = YouSongTheme.extras
+    Button(onClick = onClick, modifier = modifier.heightIn(min = 52.dp), enabled = enabled, shape = CircleShape,
+        colors = ButtonDefaults.buttonColors(containerColor = extras.cta, contentColor = extras.onCta),
+        contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.sm), content = content)
+}
+
+/** A small tonal label for the song's genre; reads "Género: Salsa" to screen readers. */
+@Composable
+internal fun GenreChip(genre: String, modifier: Modifier = Modifier) {
+    val description = stringResource(R.string.genre_description, genre)
+    Text(genre, modifier.clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer)
+        .padding(horizontal = 10.dp, vertical = 3.dp).semantics { contentDescription = description },
+        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer, maxLines = 1,
+        overflow = TextOverflow.Ellipsis)
+}
 
 /** Icon, one sentence and one action: used for every blocking or empty state. */
 @Composable
@@ -125,7 +145,7 @@ internal fun StatePanel(icon: ImageVector, title: String, body: String?, modifie
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.widthIn(max = 420.dp))
         }
         if (action != null && onAction != null) {
-            Button(onClick = onAction, modifier = Modifier.padding(top = Spacing.xs).heightIn(min = Spacing.touch)) { Text(action) }
+            CtaButton(onClick = onAction, modifier = Modifier.padding(top = Spacing.xs)) { Text(action) }
         }
     }
 }
@@ -183,10 +203,10 @@ internal fun VoteButton(state: VoteState, title: String, votes: Long, onVote: ()
     }
     when (state) {
         VoteState.Votable -> OutlinedIconButton(onClick = onVote, modifier = base,
-            border = BorderStroke(1.dp, colors.outline)) { Icon(YouSongIcons.ArrowUp, null) }
+            border = BorderStroke(1.dp, colors.outline)) { Icon(YouSongIcons.ArrowUp, null, tint = colors.primary) }
         VoteState.Voted -> FilledTonalIconButton(onClick = {}, enabled = false, modifier = base,
-            shape = MaterialTheme.shapes.small, colors = IconButtonDefaults.filledTonalIconButtonColors(
-                disabledContainerColor = colors.inverseSurface, disabledContentColor = colors.inverseOnSurface)) {
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                disabledContainerColor = YouSongTheme.extras.success, disabledContentColor = YouSongTheme.extras.onSuccess)) {
             Icon(YouSongIcons.Check, null)
         }
         VoteState.Pending -> Box(base.border(1.dp, colors.outline, CircleShape), contentAlignment = Alignment.Center) {

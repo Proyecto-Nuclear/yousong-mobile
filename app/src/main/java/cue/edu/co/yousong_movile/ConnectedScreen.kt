@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cue.edu.co.yousong_movile.ui.icons.YouSongIcons
 import cue.edu.co.yousong_movile.ui.theme.Spacing
@@ -41,6 +43,7 @@ internal fun ConnectedScreen(api: ParticipantApi, session: ParticipantSession, i
 private fun ConnectedSessionScreen(api: ParticipantApi, session: ParticipantSession, initialNotice: String?,
     onEnded: (String?) -> Unit) {
     val actions = rememberSongActions(api, session, onEnded)
+    val feed = rememberHomeFeed(api, session)
     // Only the tab is saved; credentials never enter saved instance state.
     var tab by rememberSaveable { mutableStateOf(Tab.Inicio) }
     val interactive = rememberInteractive(actions)
@@ -100,11 +103,22 @@ private fun ConnectedSessionScreen(api: ParticipantApi, session: ParticipantSess
     val search = rememberSaveable(saver = SearchState.Saver) { SearchState() }
     val busy = actions.loading || actions.pending
     val snapshot = actions.snapshot
+    // "Últimas que sonaron" changes when the song changes; reload the local's rankings then, not on a timer.
+    val playingId = snapshot?.playing?.song?.videoId
+    var seenPlaying by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(playingId) {
+        if (playingId != null && seenPlaying != null && playingId != seenPlaying) feed.loadHighlights()
+        if (playingId != null) seenPlaying = playingId
+    }
+    val hour = remember(tab) { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val trendSongs = (feed.trends as? Feed.Ready)?.value?.songs.orEmpty()
+    val tiles = remember(trendSongs) { genreTiles(trendSongs) }
+    fun open(song: Song) { selected = song }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             ShellTopBar(if (tab == Tab.Inicio) null else actions.status.name, busy, leaving,
-                onRefresh = actions::refresh, onLeave = { askLeave = true })
+                onRefresh = { actions.refresh(); if (tab == Tab.Inicio) feed.refresh() }, onLeave = { askLeave = true })
         },
         snackbarHost = { YouSongSnackbarHost(snackbar) },
         bottomBar = {
@@ -122,10 +136,11 @@ private fun ConnectedSessionScreen(api: ParticipantApi, session: ParticipantSess
                 // but is hidden from accessibility while covered.
                 Box(if (current != null) Modifier.fillMaxSize().clearAndSetSemantics {} else Modifier.fillMaxSize()) {
                 when (tab) {
-                    Tab.Inicio -> HomeScreen(actions.status.name, ui, onSearch = { tab = Tab.Buscar }, onQueue = { tab = Tab.Cola },
-                        onVote = ::vote, onRetry = actions::refresh)
+                    Tab.Inicio -> HomeScreen(actions.status.name, ui, greeting(hour), feed.trends, feed.highlights,
+                        HomeActions(onOpen = ::open, onVote = ::vote, onQueue = { tab = Tab.Cola }, onSearch = { tab = Tab.Buscar },
+                            onRetryQueue = actions::refresh, onRetryTrends = feed::loadTrends, onRetryHighlights = feed::loadHighlights))
                     Tab.Buscar -> SearchScreen(api, session.token, search, ui, onExpired = { onEnded(it) },
-                        onOpen = { selected = it }, onQuick = ::request)
+                        onOpen = ::open, onQuick = ::request, tiles = tiles)
                     Tab.Cola -> QueueScreen(ui, onVote = ::vote, onRetry = actions::refresh, onSearch = { tab = Tab.Buscar })
                 }
                 }
@@ -164,7 +179,8 @@ internal fun ShellTopBar(title: String?, loading: Boolean, leaving: Boolean, onR
     TopAppBar(
         title = {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Icon(YouSongIcons.BrandMark, stringResource(R.string.brand_mark_description), Modifier.size(28.dp))
+                Icon(YouSongIcons.BrandMark, stringResource(R.string.brand_mark_description), Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.primary)
                 title?.let { OneLine(it, MaterialTheme.typography.titleMedium) }
             }
         },
@@ -181,21 +197,30 @@ internal fun ShellTopBar(title: String?, loading: Boolean, leaving: Boolean, onR
     )
 }
 
+/** Spotify-like tabs: no pill indicator; the selected tab gets the filled icon, full ink and bold label. */
 @Composable
 internal fun ShellNavigation(tab: Tab, queued: Int, onSelect: (Tab) -> Unit) {
-    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
+    val colors = MaterialTheme.colorScheme
+    NavigationBar(containerColor = colors.surfaceContainerLow, tonalElevation = 0.dp) {
         Tab.entries.forEach { item ->
+            val selected = tab == item
             val label = stringResource(when (item) { Tab.Inicio -> R.string.tab_home; Tab.Buscar -> R.string.tab_search
                 Tab.Cola -> R.string.tab_queue })
-            val icon = when (item) { Tab.Inicio -> YouSongIcons.Home; Tab.Buscar -> YouSongIcons.Search; Tab.Cola -> YouSongIcons.QueueMusic }
+            val icon = when (item) {
+                Tab.Inicio -> if (selected) YouSongIcons.HomeFilled else YouSongIcons.Home
+                Tab.Buscar -> if (selected) YouSongIcons.SearchFilled else YouSongIcons.Search
+                Tab.Cola -> if (selected) YouSongIcons.QueueMusic else YouSongIcons.QueueMusicOutlined
+            }
             val badge = if (item == Tab.Cola && queued > 0) stringResource(R.string.queue_badge_description, queued) else null
-            NavigationBarItem(selected = tab == item, onClick = { onSelect(item) }, label = { Text(label) },
+            NavigationBarItem(selected = selected, onClick = { onSelect(item) },
+                label = { Text(label, fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium) },
                 modifier = Modifier.semantics { badge?.let { stateDescription = it } },
-                colors = NavigationBarItemDefaults.colors(indicatorColor = MaterialTheme.colorScheme.secondaryContainer),
+                colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent,
+                    selectedIconColor = colors.onSurface, selectedTextColor = colors.onSurface,
+                    unselectedIconColor = colors.onSurfaceVariant, unselectedTextColor = colors.onSurfaceVariant),
                 icon = {
                     if (badge != null) BadgedBox(badge = {
-                        Badge(containerColor = MaterialTheme.colorScheme.inverseSurface,
-                            contentColor = MaterialTheme.colorScheme.inverseOnSurface) {
+                        Badge(containerColor = YouSongTheme.extras.cta, contentColor = YouSongTheme.extras.onCta) {
                             Text(if (queued > 99) "99+" else queued.toString(), Modifier.clearAndSetSemantics {})
                         }
                     }) { Icon(icon, null) } else Icon(icon, null)
@@ -215,7 +240,8 @@ private fun ShellBanner(actions: SongActions, interactive: Boolean, contentShows
     if (problem == null && !viewOnly) return
     Surface(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.xxs),
         shape = MaterialTheme.shapes.medium,
-        color = if (problem != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHighest) {
+        color = if (problem != null) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainerHighest,
+        contentColor = if (problem != null) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onSurface) {
         Row(Modifier.padding(start = Spacing.md, end = Spacing.xs, top = Spacing.xs, bottom = Spacing.xs)
             .semantics { liveRegion = LiveRegionMode.Polite }, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -265,13 +291,14 @@ internal fun ConfirmationScreen(confirmation: Confirmation, onQueue: () -> Unit,
         Text(confirmation.position?.let { stringResource(R.string.confirm_position, it) } ?: stringResource(R.string.confirm_no_position),
             style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.widthIn(max = 420.dp))
-        Cover(song.cover, song.title, Modifier.padding(top = Spacing.xs).size(120.dp), decorative = false)
+        Cover(song.cover, song.title, Modifier.padding(top = Spacing.xs).size(160.dp), decorative = false,
+            shape = MaterialTheme.shapes.large)
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.semantics(mergeDescendants = true) {}) {
             Text(song.title, style = MaterialTheme.typography.headlineSmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             Text(song.artist, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Column(Modifier.widthIn(max = 420.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            Button(onClick = onQueue, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.confirm_view_queue)) }
+            CtaButton(onClick = onQueue, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.confirm_view_queue)) }
             TextButton(onClick = onSearch, modifier = Modifier.fillMaxWidth().heightIn(min = Spacing.touch)) {
                 Text(stringResource(R.string.confirm_keep_searching))
             }

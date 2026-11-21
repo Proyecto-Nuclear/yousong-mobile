@@ -2,6 +2,7 @@ package cue.edu.co.yousong_movile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -82,6 +83,7 @@ internal fun QueueScreen(ui: QueueUi, onVote: (QueueItem) -> Unit, onRetry: () -
  * The memorable element: a big tabular position numeral, cover, "Artista · 3:34", the wait,
  * and the round vote. The head of the queue carries the live-blue bar.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun QueueRow(item: QueueItem, state: VoteState, head: Boolean, onVote: () -> Unit, modifier: Modifier = Modifier,
     compact: Boolean = false) {
@@ -102,10 +104,16 @@ internal fun QueueRow(item: QueueItem, state: VoteState, head: Boolean, onVote: 
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 OneLine(item.song.title, MaterialTheme.typography.titleMedium, lines = 2)
                 OneLine(songMeta(item.song.artist, item.song.durationSeconds), MaterialTheme.typography.bodyMedium.tabular(),
-                    color = colors.onSurfaceVariant)
-                if (!compact) waitMinutes(item.waitSeconds)?.let {
-                    Text(if (it == 0) stringResource(R.string.wait_now) else stringResource(R.string.wait_minutes, it),
-                        style = MaterialTheme.typography.bodySmall.tabular(), color = colors.onSurfaceVariant)
+                    color = colors.onSurfaceVariant, lines = 2)
+                val wait = if (compact) null else waitMinutes(item.waitSeconds)
+                if (wait != null || item.song.genre != null) FlowRow(Modifier.padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalArrangement = Arrangement.spacedBy(2.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically) {
+                    item.song.genre?.let { GenreChip(it) }
+                    wait?.let {
+                        Text(if (it == 0) stringResource(R.string.wait_now) else stringResource(R.string.wait_minutes, it),
+                            style = MaterialTheme.typography.bodySmall.tabular(), color = colors.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -132,32 +140,44 @@ internal fun PlayingCard(playing: PlayingSong?, modifier: Modifier = Modifier) {
                         color = YouSongTheme.extras.live)
                 }
                 OneLine(playing.song.title, MaterialTheme.typography.titleLarge, lines = 2)
-                OneLine(songMeta(playing.song.artist, playing.song.durationSeconds), MaterialTheme.typography.bodyMedium.tabular(),
+                OneLine(songMeta(playing.song.artist, playing.song.durationSeconds, playing.song.genre),
+                    MaterialTheme.typography.bodyMedium.tabular(),
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
 
-/** Persistent mini-bar above the navigation while the local reports a song playing. */
+/**
+ * Persistent mini-player above the navigation while the local reports a song playing. There is no
+ * play button: playback belongs to the local. The thin accent line is how much of the song has
+ * played, as of the last queue read; it moves only when the queue refreshes, never on its own.
+ */
 @Composable
 internal fun NowPlayingBar(playing: PlayingSong, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val description = stringResource(R.string.now_playing_description, playing.song.title, playing.song.artist)
+    val colors = MaterialTheme.colorScheme
+    val remaining = if (largeFont()) null else clockLabel(playing.remainingSeconds)
+        ?.let { stringResource(R.string.now_playing_remaining, it) }
+    val played = playedFraction(playing.song.durationSeconds, playing.remainingSeconds)
     Surface(modifier.fillMaxWidth().padding(horizontal = Spacing.xs, vertical = Spacing.xxs),
-        shape = androidx.compose.foundation.shape.CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
-        Row(Modifier.clickable(onClick = onOpen).heightIn(min = 56.dp).padding(start = Spacing.xs, end = Spacing.md)
-            .clearAndSetSemantics { contentDescription = description; role = Role.Button },
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Cover(playing.song.thumbnailUrl, playing.song.title, Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape))
-            Column(Modifier.weight(1f)) {
-                OneLine(playing.song.title, MaterialTheme.typography.titleSmall)
-                OneLine(playing.song.artist, MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        shape = MaterialTheme.shapes.small, color = colors.surfaceContainerHighest, contentColor = colors.onSurface) {
+        Column(Modifier.clickable(onClick = onOpen).clearAndSetSemantics { contentDescription = description; role = Role.Button }) {
+            Row(Modifier.heightIn(min = 60.dp).padding(start = Spacing.xs, end = Spacing.md, top = Spacing.xs, bottom = Spacing.xs),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Cover(playing.song.thumbnailUrl, playing.song.title, Modifier.size(44.dp))
+                Column(Modifier.weight(1f)) {
+                    OneLine(playing.song.title, MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                    OneLine(listOfNotNull(playing.song.artist, remaining).joinToString(META_SEPARATOR),
+                        MaterialTheme.typography.bodySmall.tabular(), color = colors.onSurfaceVariant)
+                }
+                Equalizer(true, color = YouSongTheme.extras.live)
             }
-            if (!largeFont()) clockLabel(playing.remainingSeconds)?.let {
-                Text(stringResource(R.string.now_playing_remaining, it), style = MaterialTheme.typography.labelMedium.tabular(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (played != null) Box(Modifier.padding(horizontal = Spacing.sm).fillMaxWidth().height(2.dp)
+                .clip(CircleShape).background(YouSongTheme.extras.hairline)) {
+                Box(Modifier.fillMaxWidth(played).fillMaxHeight().background(colors.primary))
             }
-            Equalizer(true, color = YouSongTheme.extras.live)
+            Spacer(Modifier.height(Spacing.xxs))
         }
     }
 }

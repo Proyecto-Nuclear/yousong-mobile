@@ -148,15 +148,16 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
         .verticalScroll(rememberScrollState()).padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.readableWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-            Icon(YouSongIcons.BrandMark, stringResource(R.string.brand_mark_description), Modifier.size(56.dp))
+            Icon(YouSongIcons.BrandMark, stringResource(R.string.brand_mark_description), Modifier.size(56.dp),
+                tint = MaterialTheme.colorScheme.primary)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(stringResource(R.string.entry_title), style = MaterialTheme.typography.headlineLarge,
+                Text(stringResource(R.string.entry_title), style = MaterialTheme.typography.displayLarge,
                     modifier = Modifier.semantics { heading() })
                 Text(stringResource(R.string.entry_body), style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Button(onClick = ::startScan, enabled = active && origin != null && !busy && !scanning,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+            CtaButton(onClick = ::startScan, enabled = active && origin != null && !busy && !scanning,
+                modifier = Modifier.fillMaxWidth()) {
                 Icon(YouSongIcons.QrScan, null, Modifier.size(20.dp)); Spacer(Modifier.width(Spacing.xs))
                 Text(stringResource(if (place == null) R.string.scan_qr else R.string.scan_other_qr))
             }
@@ -180,8 +181,8 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
                 PrivacySection(privacy, f1, f2, enabled = !busy, onF1 = { f1 = it }, onF2 = { f2 = it })
                 if (!fresh) Text(stringResource(R.string.entry_refresh_first), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { join(place, privacy) }, enabled = active && !busy && fresh && canParticipate(place) && f1,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.join_action)) }
+                CtaButton(onClick = { join(place, privacy) }, enabled = active && !busy && fresh && canParticipate(place) && f1,
+                    modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.join_action)) }
             } else if (!busy && !cameraDenied) Text(stringResource(R.string.entry_no_account), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -216,7 +217,7 @@ internal fun EstablishmentCard(place: Establishment, refreshEnabled: Boolean, on
         chip == ServiceChip.Maintenance -> R.string.service_maintenance
         else -> R.string.service_unknown
     })
-    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(place.name, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
