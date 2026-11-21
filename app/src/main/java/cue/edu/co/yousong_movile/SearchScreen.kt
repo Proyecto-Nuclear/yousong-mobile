@@ -7,7 +7,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.rotate
+import cue.edu.co.yousong_movile.ui.theme.GenreTileColors
+import cue.edu.co.yousong_movile.ui.theme.tabular
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -111,7 +117,7 @@ internal class SearchState(initialQuery: String = "") {
 
 @Composable
 internal fun SearchScreen(api: ParticipantApi, token: String, state: SearchState, ui: QueueUi, onExpired: (String) -> Unit,
-    onOpen: (Song) -> Unit, onQuick: (Song) -> Unit, modifier: Modifier = Modifier) {
+    onOpen: (Song) -> Unit, onQuick: (Song) -> Unit, tiles: List<GenreTile>, modifier: Modifier = Modifier) {
     // Suggestions: the one debounce, on typing only, skipped once a search was submitted.
     LaunchedEffect(api, token, state.query, state.dismissed) {
         val normalized = ClientContract.query(state.query)
@@ -159,23 +165,29 @@ internal fun SearchScreen(api: ParticipantApi, token: String, state: SearchState
         onMore = state::more,
         onRetry = state::retry,
         modifier = modifier,
+        tiles = tiles,
+        onGenre = { state.submit(it) },
     )
 }
 
 @Composable
 internal fun SearchContent(query: String, onQuery: (String) -> Unit, onSubmit: () -> Unit, suggestions: List<Suggestion>,
     onSuggestion: (Suggestion) -> Unit, phase: SearchPhase, ui: QueueUi, onOpen: (Song) -> Unit, onQuick: (Song) -> Unit,
-    onMore: () -> Unit, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+    onMore: () -> Unit, onRetry: () -> Unit, modifier: Modifier = Modifier, tiles: List<GenreTile> = genreTiles(emptyList()),
+    onGenre: (String) -> Unit = {}) {
     val focus = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
+    val wide = phase == SearchPhase.Idle
     Column(modifier.fillMaxSize().padding(horizontal = Spacing.md), horizontalAlignment = Alignment.CenterHorizontally) {
-        Column(Modifier.readableWidth().padding(top = Spacing.md, bottom = Spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            ScreenTitle(stringResource(R.string.search_title),
-                if (phase == SearchPhase.Idle) stringResource(R.string.search_subtitle) else null)
-            OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
-                placeholder = { Text(stringResource(R.string.search_hint)) },
-                leadingIcon = { Icon(YouSongIcons.Search, null) },
+        Column(Modifier.widthIn(max = if (wide) Spacing.wideMax else Spacing.contentMax).fillMaxWidth()
+            .padding(top = Spacing.md, bottom = Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Text(stringResource(R.string.search_title), style = MaterialTheme.typography.displayMedium,
+                modifier = Modifier.semantics { heading() })
+            OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().heightIn(min = 60.dp).onFocusChanged { focused = it.isFocused },
+                placeholder = { Text(stringResource(R.string.search_hint), style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                textStyle = MaterialTheme.typography.titleMedium,
+                leadingIcon = { Icon(YouSongIcons.SearchFilled, null) },
                 trailingIcon = {
                     if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) {
                         Icon(YouSongIcons.Close, stringResource(R.string.search_clear))
@@ -187,11 +199,12 @@ internal fun SearchContent(query: String, onQuery: (String) -> Unit, onSubmit: (
                 colors = OutlinedTextFieldDefaults.colors(
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline,
                     focusedBorderColor = YouSongTheme.extras.live,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer))
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    cursorColor = YouSongTheme.extras.live))
         }
-        Box(Modifier.readableWidth().weight(1f)) {
-            SearchBody(phase, ui, onOpen, onQuick, onMore, onRetry)
+        Box(Modifier.widthIn(max = if (wide) Spacing.wideMax else Spacing.contentMax).fillMaxWidth().weight(1f)) {
+            SearchBody(phase, ui, onOpen, onQuick, onMore, onRetry, tiles, { focus.clearFocus(); onGenre(it) })
             if (suggestions.isNotEmpty() && (focused || query.isNotEmpty())) {
                 SuggestionList(suggestions, { focus.clearFocus(); onSuggestion(it) }, Modifier.zIndex(1f))
             }
@@ -201,7 +214,7 @@ internal fun SearchContent(query: String, onQuery: (String) -> Unit, onSubmit: (
 
 @Composable
 private fun SuggestionList(items: List<Suggestion>, onPick: (Suggestion) -> Unit, modifier: Modifier = Modifier) {
-    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest,
+    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, YouSongTheme.extras.hairline)) {
         Column(Modifier.padding(vertical = Spacing.xs)) {
             items.forEach { suggestion ->
@@ -234,10 +247,9 @@ private fun SuggestionList(items: List<Suggestion>, onPick: (Suggestion) -> Unit
 
 @Composable
 private fun SearchBody(phase: SearchPhase, ui: QueueUi, onOpen: (Song) -> Unit, onQuick: (Song) -> Unit, onMore: () -> Unit,
-    onRetry: () -> Unit) {
+    onRetry: () -> Unit, tiles: List<GenreTile>, onGenre: (String) -> Unit) {
     when (phase) {
-        SearchPhase.Idle -> StatePanel(YouSongIcons.MusicNote, stringResource(R.string.search_idle_title),
-            stringResource(R.string.search_idle_body))
+        SearchPhase.Idle -> ExploreGrid(tiles, onGenre)
         SearchPhase.Empty -> Column {
             ResultsHeader(0)
             StatePanel(YouSongIcons.Search, stringResource(R.string.search_empty_title), stringResource(R.string.search_empty_body),
@@ -245,24 +257,58 @@ private fun SearchBody(phase: SearchPhase, ui: QueueUi, onOpen: (Song) -> Unit, 
         }
         is SearchPhase.Failed -> StatePanel(YouSongIcons.Error, stringResource(R.string.search_error_title), phase.message,
             action = stringResource(R.string.action_retry), onAction = onRetry, tone = MaterialTheme.colorScheme.errorContainer)
-        SearchPhase.Loading -> SkeletonGrid()
-        is SearchPhase.Results -> LazyVerticalGrid(GridCells.Adaptive(150.dp), Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = Spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
-            item(span = { GridItemSpan(maxLineSpan) }) { ResultsHeader(phase.songs.size) }
+        SearchPhase.Loading -> SkeletonList()
+        is SearchPhase.Results -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
+            item { ResultsHeader(phase.songs.size) }
             items(phase.songs, key = { it.videoId }) { song ->
-                SongCard(song, songCta(song, ui.snapshot, ui.interactive), ui.pendingId == song.videoId,
+                SongRow(song, songCta(song, ui.snapshot, ui.interactive), ui.pendingId == song.videoId,
                     { onOpen(song) }, { onQuick(song) })
             }
-            if (phase.hasMore) item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            if (phase.hasMore) item {
+                Box(Modifier.fillMaxWidth().padding(top = Spacing.sm), contentAlignment = Alignment.Center) {
                     if (phase.loadingMore) CircularProgressIndicator(Modifier.size(28.dp))
-                    else OutlinedButton(onClick = onMore, modifier = Modifier.heightIn(min = Spacing.touch)) {
+                    else OutlinedButton(onClick = onMore, modifier = Modifier.heightIn(min = Spacing.touch),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)) {
                         Text(stringResource(R.string.search_more))
                     }
                 }
             }
         }
+    }
+}
+
+/** "Explorar": festival-colored genre tiles; one tap runs a search for that genre. */
+@Composable
+private fun ExploreGrid(tiles: List<GenreTile>, onGenre: (String) -> Unit) {
+    LazyVerticalGrid(GridCells.Adaptive(150.dp), Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Spacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        item(span = { GridItemSpan(maxLineSpan) }) {
+            Column(Modifier.padding(top = Spacing.xs, bottom = Spacing.xxs)) {
+                SectionHeader(stringResource(R.string.explore_title))
+                Text(stringResource(R.string.explore_body), style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        itemsIndexed(tiles, key = { _, tile -> genreKey(tile.label) }) { index, tile ->
+            GenreTileCard(tile, GenreTileColors[index % GenreTileColors.size]) { onGenre(tile.label) }
+        }
+    }
+}
+
+@Composable
+private fun GenreTileCard(tile: GenreTile, color: androidx.compose.ui.graphics.Color, onClick: () -> Unit) {
+    val action = stringResource(R.string.explore_tile_action, tile.label)
+    Box(Modifier.fillMaxWidth().heightIn(min = 96.dp).clip(MaterialTheme.shapes.small).background(color)
+        .clickable(onClickLabel = action, role = Role.Button, onClick = onClick)
+        .semantics(mergeDescendants = true) {}) {
+        // A trend cover tucked into the corner, tilted like a record sleeve on a stall; decorative.
+        tile.cover?.let {
+            Cover(it, tile.label, Modifier.align(Alignment.BottomEnd).offset(x = 14.dp, y = 10.dp).size(64.dp)
+                .rotate(22f), shape = MaterialTheme.shapes.extraSmall)
+        }
+        Text(tile.label, Modifier.padding(Spacing.sm), style = MaterialTheme.typography.titleLarge,
+            color = YouSongTheme.extras.onTile)
     }
 }
 
@@ -274,37 +320,40 @@ private fun ResultsHeader(count: Int) {
     }
 }
 
-/** One primary target (open the detail) plus an optional quick action on the cover. */
+/** A result row: cover, title, "Artista · Género · 3:34" and a quick add/vote; the row opens the detail. */
 @Composable
-private fun SongCard(song: Song, cta: SongCta, pending: Boolean, onOpen: () -> Unit, onQuick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).clickable(onClick = onOpen),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-        Box {
-            Cover(song.thumbnailUrl, song.title, Modifier.fillMaxWidth().aspectRatio(1f))
-            clockLabel(song.durationSeconds)?.let { DurationBadge(it, Modifier.align(Alignment.BottomStart).padding(Spacing.xs)) }
-            QuickAction(song.title, cta, pending, onQuick, Modifier.align(Alignment.BottomEnd).padding(Spacing.xxs))
+private fun SongRow(song: Song, cta: SongCta, pending: Boolean, onOpen: () -> Unit, onQuick: () -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.small), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).clickable(onClickLabel = stringResource(R.string.action_details), onClick = onOpen)
+            .padding(vertical = Spacing.xs).semantics(mergeDescendants = true) {},
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Cover(song.thumbnailUrl, song.title, Modifier.size(56.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                OneLine(song.title, MaterialTheme.typography.titleMedium, lines = 2)
+                OneLine(songMeta(song.artist, song.durationSeconds, song.genre), MaterialTheme.typography.bodyMedium.tabular(),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, lines = 2)
+            }
         }
-        Column(Modifier.padding(horizontal = Spacing.xxs).padding(bottom = Spacing.xs).semantics(mergeDescendants = true) {}) {
-            OneLine(song.title, MaterialTheme.typography.titleMedium, lines = 2)
-            OneLine(song.artist, MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        QuickAction(song.title, cta, pending, onQuick, Modifier.padding(start = Spacing.xxs))
     }
 }
 
 @Composable
 private fun QuickAction(title: String, cta: SongCta, pending: Boolean, onQuick: () -> Unit, modifier: Modifier) {
-    val colors = IconButtonDefaults.filledIconButtonColors(containerColor = MaterialTheme.colorScheme.inverseSurface,
-        contentColor = MaterialTheme.colorScheme.inverseOnSurface)
+    val border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+    val tint = MaterialTheme.colorScheme.primary
     when {
-        pending -> Box(modifier.size(Spacing.touch).padding(4.dp).clip(CircleShape).background(MaterialTheme.colorScheme.inverseSurface),
-            contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.inverseOnSurface)
+        pending -> Box(modifier.size(Spacing.touch).padding(4.dp).border(border, CircleShape)
+            .semantics { liveRegion = LiveRegionMode.Polite }, contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
         }
-        cta == SongCta.Request -> FilledIconButton(onClick = onQuick, modifier = modifier, colors = colors) {
-            Icon(YouSongIcons.Add, stringResource(R.string.quick_request_description, title))
+        cta == SongCta.Request -> OutlinedIconButton(onClick = onQuick, modifier = modifier.size(Spacing.touch).padding(4.dp),
+            border = border) {
+            Icon(YouSongIcons.Add, stringResource(R.string.quick_request_description, title), tint = tint)
         }
-        cta == SongCta.Vote -> FilledIconButton(onClick = onQuick, modifier = modifier, colors = colors) {
-            Icon(YouSongIcons.ArrowUp, stringResource(R.string.quick_vote_description, title))
+        cta == SongCta.Vote -> OutlinedIconButton(onClick = onQuick, modifier = modifier.size(Spacing.touch).padding(4.dp),
+            border = border) {
+            Icon(YouSongIcons.ArrowUp, stringResource(R.string.quick_vote_description, title), tint = tint)
         }
         cta == SongCta.Voted -> Box(modifier.size(Spacing.touch).padding(4.dp).clip(CircleShape)
             .background(YouSongTheme.extras.success), contentAlignment = Alignment.Center) {
@@ -315,20 +364,18 @@ private fun QuickAction(title: String, cta: SongCta, pending: Boolean, onQuick: 
 }
 
 @Composable
-private fun SkeletonGrid() {
+private fun SkeletonList() {
     val label = stringResource(R.string.search_loading)
-    val block = MaterialTheme.colorScheme.surfaceContainerHigh
-    Column(Modifier.fillMaxWidth().semantics { contentDescription = label; liveRegion = LiveRegionMode.Polite },
-        verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
+    val block = MaterialTheme.colorScheme.surfaceContainerHighest
+    Column(Modifier.fillMaxWidth().clearAndSetSemantics { contentDescription = label; liveRegion = LiveRegionMode.Polite },
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Box(Modifier.padding(vertical = Spacing.sm).size(140.dp, 24.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
-        repeat(2) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                repeat(2) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                        Box(Modifier.fillMaxWidth().aspectRatio(1f).clip(MaterialTheme.shapes.extraSmall).background(block))
-                        Box(Modifier.fillMaxWidth(0.8f).height(14.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
-                        Box(Modifier.fillMaxWidth(0.5f).height(12.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
-                    }
+        repeat(5) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Box(Modifier.size(56.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    Box(Modifier.fillMaxWidth(0.7f).height(14.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
+                    Box(Modifier.fillMaxWidth(0.45f).height(12.dp).clip(MaterialTheme.shapes.extraSmall).background(block))
                 }
             }
         }
