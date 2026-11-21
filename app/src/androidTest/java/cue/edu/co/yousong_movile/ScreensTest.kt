@@ -59,23 +59,114 @@ class ScreensTest {
         compose.runOnIdle { assertTrue(retried) }
     }
 
-    @Test fun homeShowsFavouriteUpNextAndJumpsToSearch() {
-        var searched = false
-        compose.setContent { YousongmovileTheme { HomeScreen("La Sala Azul", ui(), { searched = true }, {}, {}, {}) } }
-        compose.onNodeWithText("La Sala Azul").assertExists()
-        compose.onNodeWithText("La favorita del público", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("A continuación").assertExists()
-        compose.onNodeWithText("Votar por esta canción").assertIsEnabled()
-        compose.onNodeWithContentDescription("Busca la canción que falta").performClick()
-        compose.runOnIdle { assertTrue(searched) }
+    private val aire = Song("Cbcdef01_9-", "Aire de octubre", "Valle", true, "Valle", 227, null, "Salsa")
+    private val trends = Feed.Ready(Trends("CO", "2026-11-21T03:00:00Z", listOf(aire,
+        Song("Dbcdef01_9-", "Faro", "Costa Lenta", true, "Costa", 243, null, null))))
+    private val highlights = Feed.Ready(Highlights(30, listOf(RankedSong(aire, 12)), emptyList(), emptyList(),
+        listOf(RecentPlay(aire, "2026-11-21T03:41:00Z", false))))
+    private val playing = PlayingSong(null, QueueSong("Ebcdef01_9-", "Neón", "Ciudad Baja", true, 200, null, "Pop"),
+        "2026-11-21T03:00:00Z", 100, null)
+
+    private fun home(snapshot: QueueSnapshot? = this.snapshot, trends: Feed<Trends> = this.trends,
+        highlights: Feed<Highlights> = this.highlights, actions: HomeActions = HomeActions()) = compose.setContent {
+        YousongmovileTheme { HomeScreen("La Sala Azul", ui(snapshot), Greeting.Night, trends, highlights, actions) }
     }
 
-    @Test fun emptyHomeInvitesToRequest() {
+    private fun scrollTo(matcher: SemanticsMatcher) =
+        compose.onAllNodes(hasScrollToNodeAction())[0].performScrollToNode(matcher)
+
+    @Test fun homeGreetsShowsTheHeroAndVotesForWhatIsNext() {
+        val voted = mutableListOf<String>()
+        home(snapshot.copy(playing = playing), actions = HomeActions(onVote = { voted += it.song.title }))
+        compose.onNodeWithText("Buenas noches").assertExists()
+        compose.onNodeWithText("La Sala Azul").assertExists()
+        compose.onNodeWithText("Sonando ahora", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Ciudad Baja · Pop · 3:20", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Sigue", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Votar por Luna azul, 4 votos").assertIsEnabled().performClick()
+        compose.runOnIdle { assertEquals(listOf("Luna azul"), voted) }
+    }
+
+    @Test fun trendsCarouselRanksSongsAndOpensTheDetail() {
+        val opened = mutableListOf<Song>()
+        home(actions = HomeActions(onOpen = { opened += it }))
+        scrollTo(hasText("Tendencias en Colombia"))
+        compose.onNodeWithText("Tendencias en Colombia").assertExists()
+        compose.onNodeWithContentDescription("Puesto 1 en Colombia", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Salsa · 3:47", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Puesto 2 en Colombia", useUnmergedTree = true).assertExists()
+        compose.onAllNodes(hasText("Aire de octubre") and hasClickAction())[0].performClick()
+        compose.runOnIdle { assertEquals("Aire de octubre", opened.single().title) }
+    }
+
+    @Test fun localRankingsShowVotesAndWhenSongsPlayed() {
+        home()
+        scrollTo(hasText("Lo más votado en La Sala Azul"))
+        compose.onNodeWithText("12 votos", useUnmergedTree = true).assertExists()
+        scrollTo(hasText("Últimas que sonaron"))
+        compose.onNodeWithText("Sonó a las", substring = true, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun aFailingTrendsListShowsAQuietRetryAndTheRestStillWorks() {
+        var retried = 0
+        home(trends = Feed.Failed("La cuota del catálogo se agotó. Inténtalo más tarde."),
+            actions = HomeActions(onRetryTrends = { retried++ }))
+        compose.onNodeWithContentDescription("Votar por Luna azul, 4 votos").assertExists()
+        scrollTo(hasText("No pudimos cargar esta lista"))
+        compose.onNodeWithText("La cuota del catálogo se agotó. Inténtalo más tarde.").assertExists()
+        compose.onNodeWithText("Reintentar").performClick()
+        compose.runOnIdle { assertEquals(1, retried) }
+        scrollTo(hasText("Lo más votado en La Sala Azul"))
+    }
+
+    @Test fun loadingAndEmptyCarouselsAreCalmAndUnavailableRankingsAreHidden() {
+        home(trends = Feed.Loading, highlights = Feed.Unavailable)
+        scrollTo(hasContentDescription("Cargando Tendencias en Colombia"))
+        compose.onNodeWithText("Lo más votado", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("Últimas que sonaron").assertDoesNotExist()
+    }
+
+    @Test fun emptyHomeInvitesTheFirstRequest() {
+        var searched = false
+        home(QueueSnapshot(1, ServiceState.ABIERTO, null, emptyList()), trends = Feed.Ready(Trends("CO", "2026-11-21T03:00:00Z",
+            emptyList())), actions = HomeActions(onSearch = { searched = true }))
+        compose.onNodeWithText("Aún no suena nada").assertExists()
+        compose.onNodeWithText("Buscar canciones").performClick()
+        compose.runOnIdle { assertTrue(searched) }
+        scrollTo(hasText("YouTube aún no publica las tendencias de hoy.", substring = true))
+    }
+
+    @Test fun exploreTilesRunASearchForTheirGenre() {
+        val genres = mutableListOf<String>()
         compose.setContent {
-            YousongmovileTheme { HomeScreen("La Sala Azul", ui(QueueSnapshot(1, ServiceState.ABIERTO, null, emptyList())), {}, {}, {}, {}) }
+            YousongmovileTheme {
+                SearchContent("", {}, {}, emptyList(), {}, SearchPhase.Idle, ui(), {}, {}, {}, {},
+                    tiles = genreTiles(listOf(aire)), onGenre = { genres += it })
+            }
         }
-        compose.onNodeWithText("El local está preparando la música", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("La cola está vacía").assertExists()
+        compose.onNodeWithText("Explorar").assertExists()
+        compose.onNodeWithText("Salsa").performClick()
+        compose.onNodeWithText("Vallenato").assertExists()
+        compose.runOnIdle { assertEquals(listOf("Salsa"), genres) }
+    }
+
+    @Test fun resultRowsShowArtistGenreAndDurationAndQuickRequest() {
+        val quick = mutableListOf<Song>()
+        compose.setContent {
+            YousongmovileTheme {
+                SearchContent("Aire", {}, {}, emptyList(), {}, SearchPhase.Results(listOf(aire), false, false), ui(), {},
+                    { quick += it }, {}, {})
+            }
+        }
+        compose.onNodeWithText("Valle · Salsa · 3:47", useUnmergedTree = true).assertExists()
+        compose.onNodeWithContentDescription("Pedir Aire de octubre").performClick()
+        compose.runOnIdle { assertEquals(listOf(aire), quick) }
+    }
+
+    @Test fun queueRowsShowTheGenreWhenKnown() {
+        val withGenre = snapshot.copy(items = listOf(item(1, luna.copy(genre = "Cumbia"), 4, false)))
+        compose.setContent { YousongmovileTheme { QueueScreen(ui(withGenre), {}, {}, {}) } }
+        compose.onNodeWithContentDescription("Género: Cumbia", useUnmergedTree = true).assertExists()
     }
 
     @Test fun searchFieldClearsAndSubmitsFromTheKeyboard() {
@@ -108,6 +199,12 @@ class ScreensTest {
         compose.runOnIdle { assertEquals("aire acústico", picked.single().text) }
     }
 
+    @Test fun detailShowsTheGenreChip() {
+        compose.setContent { YousongmovileTheme { SongDetailContent(aire, SongCta.Request, false) {} } }
+        compose.onNodeWithContentDescription("Género: Salsa", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("Aire de octubre").assertExists()
+    }
+
     @Test fun detailPrimaryActionNamesWhatHappens() {
         val song = Song("Abcdef01_9-", "Luna azul", "Estudio Norte", false, "Canal", 214, null)
         var cta by mutableStateOf(SongCta.Request)
@@ -115,6 +212,7 @@ class ScreensTest {
         compose.setContent { YousongmovileTheme { SongDetailContent(song, cta, false) { acted++ } } }
         compose.onNodeWithText("Artista según el canal de YouTube").assertExists()
         compose.onNodeWithText("Video", substring = true).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Dura 3:34", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("Pedir esta canción").performClick()
         cta = SongCta.Vote
         compose.onNodeWithText("Votar por esta canción").assertIsEnabled()

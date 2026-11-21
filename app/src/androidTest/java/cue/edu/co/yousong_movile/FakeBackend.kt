@@ -16,6 +16,10 @@ import kotlin.concurrent.thread
  */
 internal class FakeBackend : AutoCloseable {
     val requests: MutableList<String> = Collections.synchronizedList(mutableListOf())
+    /** Paths of requests that carried an Authorization header. */
+    val authorized: MutableList<String> = Collections.synchronizedList(mutableListOf())
+    /** When false, the anonymous trends endpoint answers 503 CATALOG_UNAVAILABLE. */
+    @Volatile var trendsUp = true
     /** When set, queue reads block until it is counted down: a poll stays "in flight". */
     @Volatile var holdQueue: CountDownLatch? = null
     @Volatile var queueVotes = 4L
@@ -34,18 +38,23 @@ internal class FakeBackend : AutoCloseable {
         val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
         val line = reader.readLine() ?: return
         var length = 0
+        var bearer = false
         while (true) {
             val header = reader.readLine() ?: break
             if (header.isEmpty()) break
+            if (header.startsWith("Authorization:", ignoreCase = true)) bearer = true
             if (header.startsWith("Content-Length:", ignoreCase = true)) length = header.substringAfter(':').trim().toInt()
         }
         if (length > 0) CharArray(length).let { reader.read(it, 0, length) }
         val (method, target) = line.split(" ").let { it[0] to it[1] }
         requests += "$method $target"
-        val body = route(method, target.substringBefore('?'))
+        if (bearer) authorized += target.substringBefore('?')
+        val path = target.substringBefore('?')
+        val failing = path == "/api/public/tendencias" && !trendsUp
+        val body = if (failing) """{"code":"CATALOG_UNAVAILABLE"}""" else route(method, path)
         val bytes = body.toByteArray(Charsets.UTF_8)
         socket.getOutputStream().apply {
-            write(("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\n" +
+            write(((if (failing) "HTTP/1.1 503 Service Unavailable" else "HTTP/1.1 200 OK") + "\r\nContent-Type: application/json\r\nContent-Length: ${bytes.size}\r\n" +
                 "Connection: close\r\n\r\n").toByteArray())
             write(bytes); flush()
         }
@@ -68,6 +77,10 @@ internal class FakeBackend : AutoCloseable {
             """{"solicitudId":"00000000-0000-4000-8000-0000000000bb","votos":1,"votado":true,"posicion":2,"creada":true}"""
         path == "/api/participante/catalogo/busqueda" -> """{"resultados":[$AIRE_CATALOG],"siguientePagina":null}"""
         path == "/api/participante/catalogo/sugerencias" -> """{"sugerencias":[]}"""
+        path == "/api/public/tendencias" ->
+            """{"region":"CO","actualizadoAt":"2026-11-21T03:00:00Z","canciones":[$TREND]}"""
+        path == "/api/public/establecimientos/sala-azul/destacadas" ->
+            """{"periodoDias":30,"masVotadas":[{"cancion":$LUNA,"votos":9}],"masPedidas":[],"masSonadas":[],"ultimasSonadas":[]}"""
         else -> "{}"
     }
 
@@ -77,6 +90,7 @@ internal class FakeBackend : AutoCloseable {
         const val BASE = "http://127.0.0.1:8080"
         const val REQUEST_ID = "00000000-0000-4000-8000-0000000000aa"
         private const val LUNA = """{"videoId":"Abcdef01_9-","titulo":"Luna azul","artista":"Estudio Norte","artistaVerificado":true,"duracionSegundos":214,"miniaturaUrl":null}"""
+        private const val TREND = """{"videoId":"Trend001_9-","titulo":"Calle 85","artista":"La Verbena","artistaVerificado":true,"canal":"La Verbena","duracionSegundos":212,"miniaturaUrl":null,"genero":"Reggaetón"}"""
         private const val AIRE_CATALOG = """{"videoId":"Aire0001_9-","titulo":"Aire de octubre","artista":"Valle","artistaVerificado":true,"canal":"Valle","duracionSegundos":227,"miniaturaUrl":null}"""
 
         fun session() = ParticipantSession("synthetic-test-only", "2099-01-01T00:00:00Z", "p-6e8d8c", "La Sala Azul",

@@ -22,18 +22,19 @@ import cue.edu.co.yousong_movile.ui.theme.YousongmovileTheme
 
 /** Synthetic, offline sample data for the design gallery. No network, no credentials. */
 internal object Samples {
-    private fun song(id: String, title: String, artist: String, seconds: Int?, verified: Boolean = true) =
-        QueueSong(id.padEnd(11, 'x').take(11), title, artist, verified, seconds, "fake://$id")
+    private fun song(id: String, title: String, artist: String, seconds: Int?, verified: Boolean = true, genre: String? = null) =
+        QueueSong(id.padEnd(11, 'x').take(11), title, artist, verified, seconds, "fake://$id", genre)
 
-    val luna = song("luna", "Luna azul", "Estudio Norte", 214)
-    val orbita = song("orbita", "Órbita", "Satélite", 189)
+    val luna = song("luna", "Luna azul", "Estudio Norte", 214, genre = "Cumbia")
+    val orbita = song("orbita", "Órbita", "Satélite", 189, genre = "Pop")
     val faro = song("faro", "Faro", "Costa Lenta", 243)
-    val aire = song("aire", "Aire de octubre", "Valle", 227)
+    val aire = song("aire", "Aire de octubre", "Valle", 227, genre = "Salsa")
     private val extra = listOf(
-        song("noche", "Lo que queda de la noche cuando cierran el bar y alguien pide otra", "Los Amigos de Siempre", 301),
+        song("noche", "Lo que queda de la noche cuando cierran el bar y alguien pide otra", "Los Amigos de Siempre", 301,
+            genre = "Vallenato"),
         song("marea", "Marea", "Sal y Humo", 176, verified = false),
-        song("neon", "Neón", "Ciudad Baja", null),
-        song("vuelta", "Vuelta a casa", "Ruta 9", 258),
+        song("neon", "Neón", "Ciudad Baja", null, genre = "Electrónica"),
+        song("vuelta", "Vuelta a casa", "Ruta 9", 258, genre = "Rock"),
     )
 
     private fun item(index: Int, song: QueueSong, votes: Long, voted: Boolean?) = QueueItem(
@@ -49,10 +50,27 @@ internal object Samples {
     val empty = QueueSnapshot(3, ServiceState.ABIERTO, null, emptyList())
     val paused = queue.copy(state = ServiceState.PAUSADO)
 
-    fun catalog(q: QueueSong) = Song(q.videoId, q.title, q.artist, q.verified, "Canal ${q.artist}", q.durationSeconds, q.thumbnailUrl)
+    fun catalog(q: QueueSong) = Song(q.videoId, q.title, q.artist, q.verified, "Canal ${q.artist}", q.durationSeconds, q.thumbnailUrl,
+        q.genre)
     val songs = (listOf(aire, luna, orbita, faro) + extra).map(::catalog)
     val suggestions = listOf(Suggestion("Aire de octubre", catalog(aire)), Suggestion("aire acústico", null),
         Suggestion("aires de fiesta", null))
+
+    private fun trend(id: String, title: String, artist: String, seconds: Int, genre: String?) =
+        catalog(song(id, title, artist, seconds, genre = genre))
+    val trendSongs = listOf(
+        trend("t1", "Si te vas", "Mar de Leva", 198, "Reggaetón"), trend("t2", "Canoa", "Río Abajo", 241, "Vallenato"),
+        trend("t3", "Calle 85", "La Verbena", 212, "Reggaetón"), trend("t4", "Bailando sola", "Prisma", 187, "Pop"),
+        trend("t5", "Cumbia del puerto", "Los del Muelle", 263, "Cumbia"), trend("t6", "Salsa en la azotea", "Orquesta Nube", 305, "Salsa"),
+        trend("t7", "Despacio", "Kiara", 176, null), trend("t8", "Ruido rosa", "Antena", 233, "Electrónica"),
+    )
+    val trends = Feed.Ready(Trends("CO", "2026-11-21T03:00:00Z", trendSongs))
+    val highlights = Feed.Ready(Highlights(30,
+        listOf(RankedSong(catalog(luna), 18), RankedSong(catalog(aire), 14), RankedSong(catalog(orbita), 9), RankedSong(catalog(faro), 6)),
+        emptyList(), emptyList(),
+        listOf(RecentPlay(catalog(aire), "2026-11-21T03:40:00Z", true), RecentPlay(catalog(extra[2]), "2026-11-21T03:36:00Z", false),
+            RecentPlay(catalog(faro), "2026-11-21T03:31:00Z", false), RecentPlay(catalog(extra[3]), "2026-11-21T03:27:00Z", false))))
+    val tiles = genreTiles(trendSongs)
 
     val establishment = Establishment("La Sala Azul", "sala-azul", "ABIERTO", true)
     val policy = PrivacyPolicy("2026.11", listOf(
@@ -67,10 +85,13 @@ internal object Samples {
 
 /** Paints a quiet geometric cover so screenshots show real image framing. */
 internal val FakeCoverLoader: suspend (String) -> ImageBitmap? = { url ->
-    val palettes = listOf(intArrayOf(0xFFB9C9AE.toInt(), 0xFF2F4A3A.toInt(), 0xFFE7EEDC.toInt()),
-        intArrayOf(0xFFCBD6E6.toInt(), 0xFF3A4A6A.toInt(), 0xFFF2F4EE.toInt()),
-        intArrayOf(0xFFE0A77A.toInt(), 0xFF5A3A2A.toInt(), 0xFFF4E4D0.toInt()),
-        intArrayOf(0xFFC9B8D8.toInt(), 0xFF3E3352.toInt(), 0xFFEFE8F4.toInt()))
+    // "Noche de verbena" sleeves: lantern mango, aqua, festival pink and lilac over night violet.
+    val palettes = listOf(intArrayOf(0xFFFFB547.toInt(), 0xFF2A2243.toInt(), 0xFFFFE2B8.toInt()),
+        intArrayOf(0xFF3DD6C6.toInt(), 0xFF14101F.toInt(), 0xFFB6F5EC.toInt()),
+        intArrayOf(0xFFFF8FB8.toInt(), 0xFF3B3163.toInt(), 0xFFFFE0EC.toInt()),
+        intArrayOf(0xFFB9A6FF.toInt(), 0xFF1E1830.toInt(), 0xFFFFB547.toInt()),
+        intArrayOf(0xFF2A2243.toInt(), 0xFFFF9E7A.toInt(), 0xFF3DD6C6.toInt()),
+        intArrayOf(0xFFC6E86B.toInt(), 0xFF342B52.toInt(), 0xFFF6F1FF.toInt()))
     val colors = palettes[Math.floorMod(url.hashCode(), palettes.size)]
     val bitmap = Bitmap.createBitmap(256, 256, Bitmap.Config.ARGB_8888)
     Canvas(bitmap).apply {
