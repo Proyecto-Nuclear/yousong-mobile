@@ -38,6 +38,10 @@ Entry result launchers remain registered while the camera covers the app. Lifecy
 | Participant queue | `GET /api/participante/cola` |
 | Request / support song | `POST /api/participante/solicitudes` with `{videoId}` |
 | Vote | `POST /api/participante/solicitudes/{solicitudId}/votos` |
+| Colombian trends (anonymous) | `GET /api/public/tendencias` |
+| Local rankings (anonymous) | `GET /api/public/establecimientos/{qrSlug}/destacadas?dias=30` |
+
+Song objects may carry an optional Spanish `genero` label (absent, null or blank means no genre; a non-string or a label longer than 60 characters rejects the response like any other bad shape). `tendencias` returns at most 25 songs; `destacadas` returns `masVotadas`, `masPedidas`, `masSonadas` and `ultimasSonadas` with at most 10 entries each. Songs in these lists may come in the catalog shape (with `canal`) or the queue shape (without it). Both endpoints are called **without** the participant bearer, outside the queue's transport lock, once per connected screen and again only on an explicit refresh, a retry tap or (for `destacadas`) a change of the playing song. A failing list shows a quiet retry card and never blocks the queue. Sessions saved before `qrSlug` existed, or a `404` for the slug, hide the local's rankings.
 
 Join sends `canal: ANDROID`, `politicaVersion`, `autorizaF1` and `autorizaF2`. The returned opaque participant token is sent only in the configured API's `Authorization: Bearer` header. Owner JWTs are not manufactured or used. There is no participant token-refresh endpoint. Public availability requests carry no bearer credential.
 
@@ -55,6 +59,95 @@ A single connected-screen poll reads participant status, public establishment av
 Screen disposal cancels requests and invalidates ownership. Older queue versions and callbacks from disposed sessions cannot replace the active snapshot. Queue states are `ABIERTO/PAUSADO/CERRADO/MANTENIMIENTO`, distinct from session DTO values; unknown states are read-only. Missing `votado` stays unknown, never false. Queue songs do not require catalog-only `canal`; default-list playback can have a null request ID and does not get an invented vote action.
 
 Requests/votes are never automatically retried. Success, conflict and uncertain outcomes trigger authoritative status/availability/queue reads before another mutation is enabled. If a request times out after server acceptance, it cannot be undone locally: the UI explicitly warns that acceptance is uncertain and asks for refresh before repetition. Refresh cannot prove historical nonacceptance after a song leaves the active queue; the backend's once-per-song/session rule remains authoritative. Errors, provider availability/quota, permission denial and rate limits are shown in Spanish without exposing raw server payloads or credentials.
+
+## Design v2: "Noche de verbena"
+
+The teachers found v1 too plain, and the team asked for a Spotify-like app that shows what Colombia is listening to and a whole new palette. Subject: a bar jukebox for a Colombian night out, used one-handed, in the dark, between conversations. The palette is a *verbena* (street party): violet night, mango paper lanterns, one aqua glow for what is live.
+
+- **Color.** Dark is first-class: ground `#14101F`, surface `#1E1830`, raised `#2A2243`, hairline `#342B52` (decorative only), control outline `#8A7FB0`, text `#F6F1FF` / `#BDB4D6`, mango `#FFB547` (actions, rank numerals, badge), aqua `#3DD6C6` (now playing, live dot, focus, equalizer), error `#FF8F8F` on `#3A1F2B`, success `#CFF7EF` on `#17332F`. Light: `#F6F3FB` / `#FFFFFF` / `#ECE6F6`, text `#1B1530` / `#50476B`, outline `#7D7399`, accent text violet `#5B3FD0`, live teal `#09766B`. Every Material 3 role is defined in `ui/theme/Color.kt`; native windows, the scanner and the launcher icon (night ground, mango "Y", monochrome layer kept; legacy WebP icons regenerated from the same vector) mirror it.
+- **Two written deviations from the brief.** (1) Light live teal is `#09766B`, not `#0B7F73`: the latter is 4.45:1 on the light background. (2) In light mode Material's `primary` is the violet, because Material also paints text buttons, progress, cursor and checkboxes with `primary`, and mango on white is 1.6:1. Mango stays the light-mode CTA fill through `YouSongExtras.cta` and `CtaButton`, which every filled button uses. Raised surfaces pass `contentColor = onSurface` explicitly, because `surfaceContainerHighest` (dark) and `surfaceContainerHigh` (light) equal `surfaceVariant`, and Material would otherwise pick the muted `onSurfaceVariant` for their text.
+- **Type.** Manrope only (bundled). The greeting is 40sp ExtraBold with tight tracking; section headings 20sp ExtraBold; body 14-16sp. The one oversized element is the outlined mango rank numeral in "Tendencias en Colombia" (88dp, ignores font scale because it is decorative; the rank is read aloud as "Puesto N en Colombia"). Numbering is used only there, because the content is a real ranking.
+- **Layout.** Inicio: greeting by time of day, the local and its live state, a now-playing hero (with "Sigue" and its vote; with nothing playing the head of the queue takes the hero; with an empty queue it invites the first request), then horizontal carousels with 148dp covers and 16dp radius, snap fling and 16dp content padding: "Tendencias en Colombia", "A continuación", "Lo más votado en {local}", "Últimas que sonaron". Buscar: a 60dp search field, "Explorar" tiles (genres from today's trends by frequency, then Colombian defaults; a trend cover tilted in the corner when there is one), result rows "Artista · Género · 3:34" with a quick add/vote. Cola keeps its function with genre chips. Detail sheet: square hero cover, genre chip, duration, one primary CTA. Mini-player shows how much of the song has played as of the last queue read. Radii grow with size: 8 row covers, 12 tiles and mini-player, 16 carousel covers, 24 hero, 28 sheet. Inicio and Explorar cap at 960dp, reading columns at 640dp.
+- **Motion.** Only the playing equalizer moves on its own; vote counts pulse once when they change; covers cross-fade on load. All of it stops under the system "remove animations" setting. Skeletons are static.
+- **Accessibility.** Headings on the greeting and every section, merged card/row semantics with "Ver detalle" click labels, content descriptions on covers that carry meaning, genre chips read as "Género: Salsa", 48dp targets, live regions on snackbars, skeletons and retry cards. Checked at font scale 2.0 and on an 840dp frame in the design gallery.
+
+WCAG 2.x contrast for every text/background pair and control outline (text needs 4.5:1, controls 3:1). Genre tiles all carry `#1B1530` text.
+
+**DARK**
+
+| Pair | Foreground | Background | Ratio | Min |
+| --- | --- | --- | --- | --- |
+| onSurface/background | `#F6F1FF` | `#14101F` | 16.86:1 | 4.5:1 |
+| onSurface/surface | `#F6F1FF` | `#1E1830` | 15.42:1 | 4.5:1 |
+| onSurface/raised | `#F6F1FF` | `#2A2243` | 13.45:1 | 4.5:1 |
+| onSurfaceVariant/background | `#BDB4D6` | `#14101F` | 9.49:1 | 4.5:1 |
+| onSurfaceVariant/surface | `#BDB4D6` | `#1E1830` | 8.68:1 | 4.5:1 |
+| onSurfaceVariant/raised | `#BDB4D6` | `#2A2243` | 7.57:1 | 4.5:1 |
+| onSurfaceVariant/high #241D3A | `#BDB4D6` | `#241D3A` | 8.13:1 | 4.5:1 |
+| primary text/background | `#FFB547` | `#14101F` | 10.64:1 | 4.5:1 |
+| primary text/raised | `#FFB547` | `#2A2243` | 8.49:1 | 4.5:1 |
+| onPrimary/primary | `#1B1530` | `#FFB547` | 9.99:1 | 4.5:1 |
+| live aqua/background | `#3DD6C6` | `#14101F` | 10.35:1 | 4.5:1 |
+| live aqua/raised | `#3DD6C6` | `#2A2243` | 8.26:1 | 4.5:1 |
+| onTertiary/aqua | `#0B2B28` | `#3DD6C6` | 8.37:1 | 4.5:1 |
+| error text/background | `#FF8F8F` | `#14101F` | 8.52:1 | 4.5:1 |
+| error text/surface | `#FF8F8F` | `#1E1830` | 7.80:1 | 4.5:1 |
+| onErrorContainer/errorContainer | `#FFD9DC` | `#3A1F2B` | 11.49:1 | 4.5:1 |
+| onSuccess/success | `#CFF7EF` | `#17332F` | 11.74:1 | 4.5:1 |
+| onPrimaryContainer/primaryContainer | `#FFE2B8` | `#4D3510` | 9.18:1 | 4.5:1 |
+| onSecondaryContainer/secondaryContainer | `#E9E1FF` | `#3B3163` | 9.24:1 | 4.5:1 |
+| secondary lilac/background | `#C9B8FF` | `#14101F` | 10.49:1 | 4.5:1 |
+| inverseOnSurface/inverseSurface | `#1E1830` | `#F6F1FF` | 15.42:1 | 4.5:1 |
+| outline control/background | `#8A7FB0` | `#14101F` | 5.11:1 | 3:1 |
+| outline control/surface | `#8A7FB0` | `#1E1830` | 4.67:1 | 3:1 |
+| outline control/raised | `#8A7FB0` | `#2A2243` | 4.08:1 | 3:1 |
+| badge onPrimary/mango | `#1B1530` | `#FFB547` | 9.99:1 | 4.5:1 |
+| white/coverScrim | `#FFFFFF` | `#14101F` | 18.69:1 | 4.5:1 |
+| mini-player title onSurface/#2A2243 | `#F6F1FF` | `#2A2243` | 13.45:1 | 4.5:1 |
+| genre chip onSecondaryContainer | `#E9E1FF` | `#3B3163` | 9.24:1 | 4.5:1 |
+
+**LIGHT**
+
+| Pair | Foreground | Background | Ratio | Min |
+| --- | --- | --- | --- | --- |
+| onSurface/background | `#1B1530` | `#F6F3FB` | 15.99:1 | 4.5:1 |
+| onSurface/surface | `#1B1530` | `#FFFFFF` | 17.55:1 | 4.5:1 |
+| onSurface/container | `#1B1530` | `#ECE6F6` | 14.39:1 | 4.5:1 |
+| onSurfaceVariant/background | `#50476B` | `#F6F3FB` | 7.79:1 | 4.5:1 |
+| onSurfaceVariant/surface | `#50476B` | `#FFFFFF` | 8.56:1 | 4.5:1 |
+| onSurfaceVariant/container | `#50476B` | `#ECE6F6` | 7.01:1 | 4.5:1 |
+| onPrimary/mango CTA | `#1B1530` | `#FFB547` | 9.99:1 | 4.5:1 |
+| accent violet/background | `#5B3FD0` | `#F6F3FB` | 6.24:1 | 4.5:1 |
+| accent violet/surface | `#5B3FD0` | `#FFFFFF` | 6.85:1 | 4.5:1 |
+| accent violet/container | `#5B3FD0` | `#ECE6F6` | 5.61:1 | 4.5:1 |
+| white/violet (onPrimary role) | `#FFFFFF` | `#5B3FD0` | 6.85:1 | 4.5:1 |
+| live teal/background | `#09766B` | `#F6F3FB` | 5.01:1 | 4.5:1 |
+| live teal/surface | `#09766B` | `#FFFFFF` | 5.50:1 | 4.5:1 |
+| live teal/container | `#09766B` | `#ECE6F6` | 4.51:1 | 4.5:1 |
+| error/background | `#B3261E` | `#F6F3FB` | 5.95:1 | 4.5:1 |
+| onErrorContainer/errorContainer | `#410E0B` | `#FADCE0` | 12.67:1 | 4.5:1 |
+| onSuccess/success | `#0B3D37` | `#D3F2EC` | 10.18:1 | 4.5:1 |
+| onPrimaryContainer/primaryContainer | `#1B1530` | `#FFB547` | 9.99:1 | 4.5:1 |
+| onSecondaryContainer/secondaryContainer | `#1F1248` | `#E4DCFF` | 12.90:1 | 4.5:1 |
+| inverseOnSurface/inverseSurface | `#F6F1FF` | `#2B2442` | 13.21:1 | 4.5:1 |
+| outline control/background | `#7D7399` | `#F6F3FB` | 4.00:1 | 3:1 |
+| outline control/surface | `#7D7399` | `#FFFFFF` | 4.39:1 | 3:1 |
+| outline control/container | `#7D7399` | `#ECE6F6` | 3.60:1 | 3:1 |
+| genre chip onSecondaryContainer | `#1F1248` | `#E4DCFF` | 12.90:1 | 4.5:1 |
+| badge #1B1530 on mango | `#1B1530` | `#FFB547` | 9.99:1 | 4.5:1 |
+
+**GENRE TILES (dark text #1B1530)**
+
+| Pair | Foreground | Background | Ratio | Min |
+| --- | --- | --- | --- | --- |
+| mango | `#1B1530` | `#FFB547` | 9.99:1 | 4.5:1 |
+| aqua | `#1B1530` | `#3DD6C6` | 9.72:1 | 4.5:1 |
+| rosa | `#1B1530` | `#FF8FB8` | 8.25:1 | 4.5:1 |
+| lila | `#1B1530` | `#B9A6FF` | 8.33:1 | 4.5:1 |
+| lima | `#1B1530` | `#C6E86B` | 12.67:1 | 4.5:1 |
+| coral | `#1B1530` | `#FF9E7A` | 8.71:1 | 4.5:1 |
+| cielo | `#1B1530` | `#7CC8FF` | 9.66:1 | 4.5:1 |
+| arena | `#1B1530` | `#F2D49B` | 12.26:1 | 4.5:1 |
 
 ## Session and security
 
@@ -111,4 +204,8 @@ Independent Android verification is currently **unavailable**, not passed: the v
 
 `SessionStorageTest` covers native Keystore round-trip, optional encrypted metadata, legacy/malformed metadata retention, tamper cleanup and erasure in isolated device test storage. JSON parsing tests cover public availability, nullable next opening, unknown/maintenance queue states and default-list playback. APK assembly only compiles instrumentation; it does not establish native Keystore or device behavior.
 
-No authorized disposable emulator/device is available. Scanner permission/denial/cancel, camera decoding, Keystore hardware/platform behavior, process recreation, polling/401/leave against a running backend, rendered UI/accessibility and the full two-participant/owner demonstration remain unverified. No live backend/provider mutations, seed, emulator or personal phone are used by this change. Do not install on a personal device or start an emulator without explicit authorization.
+### UI v2 verification
+
+On the authorized disposable emulator (AVD `Medium_Phone_API_37.0`, `emulator-5554`), the instrumented suite (55 tests, including fake-backend checks that public endpoints never carry the bearer) passed through `adb shell am instrument`, and the offline design gallery rendered every v2 screen and state in dark and light at font scale 1.0 and 2.0 plus small and 840dp frames. The gallery folder is selected with `-e gallery_folder <name>`. Trends and local rankings were verified only against fixtures and the fake backend, not a running backend.
+
+Earlier note: no authorized disposable emulator/device was available. Scanner permission/denial/cancel, camera decoding, Keystore hardware/platform behavior, process recreation, polling/401/leave against a running backend, rendered UI/accessibility and the full two-participant/owner demonstration remain unverified. No live backend/provider mutations, seed, emulator or personal phone are used by this change. Do not install on a personal device or start an emulator without explicit authorization.
