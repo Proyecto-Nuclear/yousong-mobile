@@ -41,9 +41,10 @@ data class PrivacyPolicy(val version: String, val purposes: List<Purpose>)
 class ParticipantSession(val token: String, val expiresAt: String, val pseudonym: String, val name: String,
     val service: String, val qrSlug: String? = null)
 data class SessionStatus(val name: String, val pseudonym: String, val service: String)
+/** A catalog song. [genre] is an optional Spanish label from the backend; null when it has none. */
 data class Song(
     val videoId: String, val title: String, val artist: String, val verified: Boolean,
-    val channel: String, val durationSeconds: Int?, val thumbnailUrl: String?
+    val channel: String, val durationSeconds: Int?, val thumbnailUrl: String?, val genre: String? = null
 )
 data class SearchPage(val songs: List<Song>, val nextPage: String?)
 fun durationLabel(seconds: Int?): String = seconds?.takeIf { it >= 0 }?.let {

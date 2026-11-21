@@ -1,11 +1,15 @@
 package cue.edu.co.yousong_movile
 
 import java.net.URLEncoder
+import org.json.JSONException
 import org.json.JSONObject
 
 enum class ServiceState { ABIERTO, PAUSADO, CERRADO, MANTENIMIENTO, UNKNOWN }
 data class QueueSong(val videoId: String, val title: String, val artist: String, val verified: Boolean,
-    val durationSeconds: Int?, val thumbnailUrl: String?)
+    val durationSeconds: Int?, val thumbnailUrl: String?, val genre: String? = null)
+
+/** Queue songs carry no catalog channel; the detail sheet only needs the shared fields. */
+internal fun QueueSong.asSong() = Song(videoId, title, artist, verified, "", durationSeconds, thumbnailUrl, genre)
 data class QueueItem(val requestId: String, val position: Int, val votes: Long, val song: QueueSong,
     val waitSeconds: Long, val voted: Boolean?)
 data class PlayingSong(val requestId: String?, val song: QueueSong, val startedAt: String,
@@ -41,7 +45,8 @@ internal fun parseQueue(json: JSONObject): QueueSnapshot {
 
 private fun parseQueueSong(json: JSONObject) = QueueSong(json.getString("videoId"), json.getString("titulo"),
     json.getString("artista"), json.getBoolean("artistaVerificado"),
-    if (json.isNull("duracionSegundos")) null else json.getInt("duracionSegundos"), json.nullableString("miniaturaUrl"))
+    if (json.isNull("duracionSegundos")) null else json.getInt("duracionSegundos"), json.nullableString("miniaturaUrl"),
+    json.optionalGenre())
 
 internal fun parseSupport(json: JSONObject) = SupportResult(json.getString("solicitudId"), json.getLong("votos"),
     json.getBoolean("votado"), if (json.isNull("posicion")) null else json.getInt("posicion"), json.getBoolean("creada"))
@@ -60,5 +65,19 @@ internal fun parseSuggestions(json: JSONObject): List<Suggestion> {
 }
 
 private fun JSONObject.nullableString(key: String): String? = if (isNull(key)) null else getString(key)
+
+/**
+ * Optional `genero`: absent or null is "no genre"; a blank label is treated the same. Anything that is
+ * not a short string is a contract break and rejects the whole response, like every other bad shape.
+ */
+internal fun JSONObject.optionalGenre(): String? {
+    if (isNull("genero")) return null
+    val value = get("genero") as? String ?: throw JSONException("genero must be a string")
+    val label = value.trim().replace(Regex("\\s+"), " ")
+    if (label.length > GENRE_MAX) throw JSONException("genero is too long")
+    return label.ifEmpty { null }
+}
+
+internal const val GENRE_MAX = 60
 // Absent participant context must never become permission to vote again.
 private fun JSONObject.optionalVote(): Boolean? = if (!has("votado") || isNull("votado")) null else getBoolean("votado")
