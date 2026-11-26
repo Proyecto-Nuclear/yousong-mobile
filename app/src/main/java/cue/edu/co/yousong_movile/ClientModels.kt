@@ -17,13 +17,32 @@ object ClientContract {
         return path.removePrefix("/s/").takeIf { path.startsWith("/s/") && slugPattern.matches(it) }
     }
 
-    fun apiBase(input: String, debug: Boolean = false): String? {
+    /** Emulator host and paired-phone loopback (adb reverse): the only HTTP origins every debug build accepts. */
+    private val debugHttpOrigins = setOf("http://10.0.2.2:8080", "http://127.0.0.1:8080")
+
+    /**
+     * The API origin, or null when it is not allowed. HTTPS always; plain HTTP only in debug builds, only on port
+     * 8080 and only for the fixed debug hosts or [lanHost], the LAN address chosen at build time
+     * (`-PyousongLanHost`), which must be a private IPv4 address ([privateLanHost]).
+     */
+    fun apiBase(input: String, debug: Boolean = false, lanHost: String = ""): String? {
         val text = input.trim().trimEnd('/')
         val uri = runCatching { URI(text) }.getOrNull() ?: return null
+        val http = debug && (text in debugHttpOrigins || (privateLanHost(lanHost) && text == "http://$lanHost:8080"))
         return text.takeIf {
-            (uri.scheme == "https" || (debug && text in setOf("http://10.0.2.2:8080", "http://192.168.1.21:8080", "http://127.0.0.1:8080"))) && uri.host != null && uri.userInfo == null &&
+            (uri.scheme == "https" || http) && uri.host != null && uri.userInfo == null &&
                 uri.rawQuery == null && uri.rawFragment == null && uri.rawPath.isNullOrEmpty()
         }
+    }
+
+    private val ipv4 = Regex("(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})\\.(0|[1-9][0-9]{0,2})")
+
+    /** True only for a dotted IPv4 address in 10.0.0.0/8, 172.16.0.0/12 or 192.168.0.0/16 (RFC 1918). */
+    fun privateLanHost(host: String): Boolean {
+        val octets = ipv4.matchEntire(host)?.groupValues?.drop(1)?.map { it.toInt() } ?: return false
+        if (octets.any { it > 255 }) return false
+        val (a, b) = octets
+        return a == 10 || (a == 172 && b in 16..31) || (a == 192 && b == 168)
     }
 
     fun query(input: String): String? = input.trim().replace(Regex("\\s+"), " ").takeIf { it.length in 2..100 }

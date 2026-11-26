@@ -10,7 +10,7 @@ class ApiFailure(val status: Int, val code: String) : Exception("API request fai
 
 /** All I/O stays off main; redirects are forbidden so bearer headers cannot cross origins. */
 class ParticipantApi(private val base: String) {
-    init { require(ClientContract.apiBase(base, BuildConfig.DEBUG) != null) }
+    init { require(ClientContract.apiBase(base, BuildConfig.DEBUG, BuildConfig.LAN_API_HOST) != null) }
 
     suspend fun establishment(slug: String): Establishment {
         require(validatedQrSlug(slug) != null)

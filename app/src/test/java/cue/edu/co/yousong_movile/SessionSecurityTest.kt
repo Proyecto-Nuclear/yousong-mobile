@@ -14,16 +14,36 @@ class SessionSecurityTest {
     }
     private fun session(expiry: String = "2099-01-01T00:00:00Z") = ParticipantSession("synthetic-test-only", expiry, "Visitor", "Venue", "ABIERTO")
 
-    @Test fun debugAllowsOnlyTheTwoExplicitDevelopmentOriginsAndPreservesHttps() {
-        listOf("http://10.0.2.2:8080", "http://192.168.1.21:8080").forEach {
-            assertEquals(it, ClientContract.apiBase(it, debug = true))
-            assertNull(ClientContract.apiBase(it, debug = false))
-        }
-        listOf("http://10.0.2.2:8081", "http://localhost:8080", "http://192.168.1.22:8080", "http://10.0.2.2:8080/api", "http://u:p@10.0.2.2:8080").forEach {
+    @Test fun debugAllowsOnlyTheEmulatorOriginWithoutLanHostAndPreservesHttps() {
+        assertEquals("http://10.0.2.2:8080", ClientContract.apiBase("http://10.0.2.2:8080", debug = true))
+        assertNull(ClientContract.apiBase("http://10.0.2.2:8080", debug = false))
+        listOf("http://10.0.2.2:8081", "http://localhost:8080", "http://192.168.1.21:8080", "http://10.0.2.2:8080/api", "http://u:p@10.0.2.2:8080").forEach {
             assertNull(ClientContract.apiBase(it, debug = true))
         }
         assertEquals("https://api.example", ClientContract.apiBase("https://api.example/", debug = true))
         assertEquals("sala-azul", ClientContract.slug("https://untrusted.example/s/sala-azul"))
+    }
+    @Test fun configuredLanHostIsAllowedOnlyInDebugOnPort8080() {
+        val lan = "192.168.1.21"
+        assertEquals("http://192.168.1.21:8080", ClientContract.apiBase("http://192.168.1.21:8080/", debug = true, lanHost = lan))
+        assertNull(ClientContract.apiBase("http://192.168.1.21:8080", debug = false, lanHost = lan))
+        listOf("http://192.168.1.21:8081", "http://192.168.1.22:8080", "http://192.168.1.21:8080/api",
+            "http://u:p@192.168.1.21:8080", "http://192.168.1.21:8080?x=1").forEach {
+            assertNull(ClientContract.apiBase(it, debug = true, lanHost = lan))
+        }
+        assertEquals("http://10.0.2.2:8080", ClientContract.apiBase("http://10.0.2.2:8080", debug = true, lanHost = lan))
+    }
+    @Test fun onlyPrivateIpv4AddressesCanBeTheLanHost() {
+        listOf("10.0.0.5", "172.16.0.1", "172.31.255.254", "192.168.0.10").forEach {
+            assertTrue(it, ClientContract.privateLanHost(it))
+            assertEquals("http://$it:8080", ClientContract.apiBase("http://$it:8080", debug = true, lanHost = it))
+        }
+        listOf("", "8.8.8.8", "172.32.0.1", "172.15.0.1", "192.169.0.1", "localhost", "api.example",
+            "192.168.1", "192.168.1.256", "192.168.01.1", "10.0.0.5:8080", " 10.0.0.5").forEach {
+            assertFalse(it, ClientContract.privateLanHost(it))
+            assertNull(ClientContract.apiBase("http://$it:8080", debug = true, lanHost = it))
+        }
+        assertFalse(ClientContract.privateLanHost("127.0.0.1"))
     }
     @Test fun pairedPhoneLoopbackIsDebugOnlyAndNeverBroadensLocalHttp() {
         val loopback = "http://127.0.0.1:8080"

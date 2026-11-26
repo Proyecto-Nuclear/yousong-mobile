@@ -35,7 +35,7 @@ class KeystoreSessionStore(context: Context) : SessionRecordStore {
             require(stream.channel.size() <= 65_536)
             val input = DataInputStream(stream)
             val origin = input.readUTF()
-            require(ClientContract.apiBase(origin, BuildConfig.DEBUG) == origin)
+            require(ClientContract.apiBase(origin, BuildConfig.DEBUG, BuildConfig.LAN_API_HOST) == origin)
             val json = JSONObject(String(cipher.decrypt(input.readBytes(), origin), Charsets.UTF_8))
             origin to ParticipantSession(json.getString("token"), json.getString("expiresAt"),
                 json.getString("pseudonym"), json.getString("name"), json.getString("service"),
@@ -44,7 +44,7 @@ class KeystoreSessionStore(context: Context) : SessionRecordStore {
     }
 
     override fun write(origin: String, session: ParticipantSession) {
-        require(ClientContract.apiBase(origin, BuildConfig.DEBUG) == origin)
+        require(ClientContract.apiBase(origin, BuildConfig.DEBUG, BuildConfig.LAN_API_HOST) == origin)
         val payload = JSONObject().put("token", session.token).put("expiresAt", session.expiresAt)
             .put("pseudonym", session.pseudonym).put("name", session.name).put("service", session.service)
             .apply { validatedQrSlug(session.qrSlug)?.let { put("qrSlug", it) } }
