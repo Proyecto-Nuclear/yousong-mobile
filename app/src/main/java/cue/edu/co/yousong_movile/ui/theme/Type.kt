@@ -25,10 +25,12 @@ private val Tight = (-0.02).em
 private fun style(size: Int, line: Int, weight: FontWeight, tracking: androidx.compose.ui.unit.TextUnit = 0.sp) =
     TextStyle(fontFamily = Manrope, fontSize = size.sp, lineHeight = line.sp, fontWeight = weight, letterSpacing = tracking)
 
-// Scale (sp): 12 / 14 / 16 / 20 / 24 / 32.
+// Scale (sp): 12 / 14 / 16 / 20 / 24 / 32 / 40. Display sizes are for the home greeting only.
+private val Tighter = (-0.035).em
+
 val Typography = Typography(
-    displayLarge = style(32, 38, FontWeight.ExtraBold, Tight),
-    displayMedium = style(32, 38, FontWeight.Bold, Tight),
+    displayLarge = style(40, 44, FontWeight.ExtraBold, Tighter),
+    displayMedium = style(32, 38, FontWeight.ExtraBold, Tighter),
     displaySmall = style(24, 30, FontWeight.ExtraBold, Tight),
     headlineLarge = style(32, 38, FontWeight.ExtraBold, Tight),
     headlineMedium = style(24, 30, FontWeight.ExtraBold, Tight),
@@ -47,5 +49,11 @@ val Typography = Typography(
 /** Tabular figures so votes, waits and durations do not jitter as they change. */
 fun TextStyle.tabular(): TextStyle = copy(fontFeatureSettings = "tnum")
 
-/** The queue position numeral: the one oversized typographic element in the app. */
+/** The queue position numeral. */
 val PositionNumeral = style(24, 28, FontWeight.ExtraBold, Tight).tabular()
+
+/**
+ * The trend rank: the one oversized typographic element in the app, drawn as an outline next to
+ * the cover in "Tendencias en Colombia" (the content is a real ranking, so numbering is information).
+ */
+val RankNumeral = style(88, 88, FontWeight.ExtraBold, (-0.06).em).tabular()

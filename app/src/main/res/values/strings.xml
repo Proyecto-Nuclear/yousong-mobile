@@ -4,7 +4,6 @@
     <string name="api_base_url" translatable="false"></string>
 
     <!-- Shared -->
-    <string name="meta_artist_duration">%1$s · %2$s</string>
     <string name="cover_description">Portada de %1$s</string>
     <string name="action_retry">Reintentar</string>
     <string name="action_close">Cerrar</string>
@@ -22,6 +21,9 @@
     </plurals>
     <string name="wait_minutes">Espera ~ %1$d min</string>
     <string name="wait_now">Suena enseguida</string>
+    <string name="genre_description">Género: %1$s</string>
+    <string name="duration_description">Dura %1$s</string>
+    <string name="action_details">Ver detalle</string>
 
     <!-- Shell -->
     <string name="brand_mark_description">YouSong</string>
@@ -44,12 +46,26 @@
     <string name="now_playing_description">Sonando ahora: %1$s, de %2$s</string>
 
     <!-- Inicio -->
-    <string name="home_tagline">Elige lo que viene.</string>
-    <string name="home_search_entry">Busca la canción que falta</string>
-    <string name="favourite_label">La favorita del público</string>
-    <string name="vote_for_this_song">Votar por esta canción</string>
+    <string name="greeting_morning">Buenos días</string>
+    <string name="greeting_afternoon">Buenas tardes</string>
+    <string name="greeting_night">Buenas noches</string>
+    <string name="home_next_label">Sigue</string>
+    <string name="home_up_next_hero">Lo próximo en sonar</string>
+    <string name="home_quiet_title">Aún no suena nada</string>
+    <string name="home_quiet_body">Pide la primera canción de la noche.</string>
+    <string name="section_trends">Tendencias en Colombia</string>
+    <string name="section_trends_note">Lo más escuchado hoy en YouTube Colombia</string>
+    <string name="section_most_voted">Lo más votado en %1$s</string>
+    <string name="section_recent">Últimas que sonaron</string>
+    <string name="see_queue">Ver cola</string>
+    <string name="rank_description">Puesto %1$d en Colombia</string>
+    <string name="played_at">Sonó a las %1$s</string>
+    <string name="shelf_loading">Cargando %1$s</string>
+    <string name="shelf_error_title">No pudimos cargar esta lista</string>
+    <string name="shelf_trends_empty">YouTube aún no publica las tendencias de hoy. Vuelve a mirar más tarde.</string>
+    <string name="shelf_most_voted_empty">Aún no hay votos este mes. Los tuyos pueden ser los primeros.</string>
+    <string name="shelf_recent_empty">Aún no ha sonado ninguna canción pedida aquí.</string>
     <string name="up_next">A continuación</string>
-    <string name="see_full_queue">Ver la cola completa</string>
     <string name="no_playback_kicker">Sin reproducción activa</string>
     <string name="no_playback_title">El local está preparando la música</string>
     <string name="no_playback_body">Busca una canción y sé el primero en pedirla.</string>
@@ -59,14 +75,14 @@
 
     <!-- Buscar -->
     <string name="search_title">Algo para esta noche</string>
-    <string name="search_subtitle">Busca por canción, artista o un pedazo de la letra.</string>
     <string name="search_hint">¿Qué quieres escuchar?</string>
     <string name="search_clear">Borrar búsqueda</string>
+    <string name="explore_title">Explorar</string>
+    <string name="explore_body">Toca un género para buscar sus canciones.</string>
+    <string name="explore_tile_action">Buscar canciones de %1$s</string>
     <string name="search_results">Resultados</string>
     <string name="suggestion_song_description">Canción: %1$s</string>
     <string name="suggestion_query_description">Buscar: %1$s</string>
-    <string name="search_idle_title">Empieza con un nombre</string>
-    <string name="search_idle_body">Escribe al menos dos letras y toca buscar en el teclado.</string>
     <string name="search_empty_title">No encontramos esa canción</string>
     <string name="search_empty_body">Prueba con otro título o con el nombre del artista.</string>
     <string name="search_error_title">La búsqueda no respondió</string>
@@ -76,7 +92,6 @@
     <string name="quick_vote_description">Votar por %1$s</string>
 
     <!-- Detalle -->
-    <string name="detail_title">Detalle de la canción</string>
     <string name="cta_request">Pedir esta canción</string>
     <string name="cta_vote">Votar por esta canción</string>
     <string name="cta_voted">Ya votaste por esta canción</string>
@@ -151,6 +166,9 @@
     <string name="opening_tomorrow">Abre mañana a las %1$s</string>
     <string name="opening_other">Abre el %1$s a las %2$s</string>
     <string name="privacy_title">Tu privacidad</string>
+    <string name="privacy_intro">Antes de entrar, decide qué autorizas. Ninguna opción viene marcada.</string>
+    <string name="privacy_read_full">Leer la política completa</string>
+    <string name="privacy_hide_full">Ocultar la política</string>
     <string name="privacy_version">Política versión %1$s</string>
     <string name="consent_required">Necesario para participar</string>
     <string name="consent_optional">Opcional: ayudarnos a mejorar</string>

@@ -16,4 +16,6 @@ object Spacing {
     val touch = 48.dp
     /** Readable column on tablets and landscape. */
     val contentMax = 640.dp
+    /** Inicio and Explorar: wide enough for carousels and tiles on tablets, still capped. */
+    val wideMax = 960.dp
 }

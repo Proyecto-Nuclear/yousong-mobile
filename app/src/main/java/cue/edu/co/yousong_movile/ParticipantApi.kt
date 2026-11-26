@@ -19,8 +19,11 @@ class ParticipantApi(private val base: String) {
 
     suspend fun policy(): PrivacyPolicy = request("/api/public/politica").let { json ->
         val purposes = json.getJSONArray("finalidades")
+        val sections = json.optJSONArray("secciones")
         PrivacyPolicy(json.getString("version"), List(purposes.length()) {
             purposes.getJSONObject(it).let { item -> Purpose(item.getString("codigo"), item.getString("descripcion")) }
+        }, List(sections?.length() ?: 0) {
+            sections!!.getJSONObject(it).let { item -> PolicySection(item.getString("titulo"), item.getString("texto")) }
         })
     }
 
@@ -57,6 +60,13 @@ class ParticipantApi(private val base: String) {
 
     suspend fun suggestions(token: String, query: String): List<Suggestion> =
         parseSuggestions(request(QueueContract.suggestionsPath(query), token = token))
+
+    /** Anonymous: never carries the participant bearer. */
+    suspend fun trends(): Trends = parseTrends(request(DiscoveryContract.TRENDS_PATH))
+
+    /** Anonymous: never carries the participant bearer. */
+    suspend fun highlights(slug: String, days: Int = DiscoveryContract.DEFAULT_DAYS): Highlights =
+        parseHighlights(request(DiscoveryContract.highlightsPath(slug, days)))
 
     private suspend fun request(path: String, method: String = "GET", token: String? = null, body: JSONObject? = null): JSONObject =
         withContext(Dispatchers.IO) {
@@ -106,13 +116,14 @@ internal fun parseSearch(json: JSONObject): SearchPage {
 internal fun parseCatalogSong(json: JSONObject): Song = Song(json.getString("videoId"), json.getString("titulo"),
     json.getString("artista"), json.getBoolean("artistaVerificado"), json.getString("canal"),
     if (json.isNull("duracionSegundos")) null else json.getInt("duracionSegundos"),
-    if (json.isNull("miniaturaUrl")) null else json.getString("miniaturaUrl"))
+    if (json.isNull("miniaturaUrl")) null else json.getString("miniaturaUrl"), json.optionalGenre())
 
 fun errorLabel(error: Exception): String = when {
     error is ApiFailure && error.status == 401 -> "Tu sesión terminó o tu acceso caducó. Vuelve a escanear el QR del local."
     error is ApiFailure && error.code == "SEARCH_BUDGET_EXHAUSTED" -> "El local agotó sus búsquedas de hoy. Consulta al personal."
     error is ApiFailure && error.code == "CATALOG_NOT_CONFIGURED" -> "El catálogo de música no está configurado. Consulta al personal."
     error is ApiFailure && error.code == "CATALOG_QUOTA_EXCEEDED" -> "La cuota del catálogo se agotó. Inténtalo más tarde."
+    error is ApiFailure && error.code == "CATALOG_UNAVAILABLE" -> "El catálogo de música no responde ahora. Inténtalo en unos minutos."
     error is ApiFailure && error.status == 429 -> "Vas muy rápido. Espera un momento y vuelve a intentarlo."
     error is ApiFailure && error.code == "POLICY_VERSION_MISMATCH" -> "El local actualizó su política de privacidad. Vuelve a escanear el QR para aceptarla."
     error is ApiFailure && error.status == 403 -> "No puedes hacer esto desde tu sesión."

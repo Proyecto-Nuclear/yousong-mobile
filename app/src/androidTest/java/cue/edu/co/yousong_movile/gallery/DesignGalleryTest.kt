@@ -13,6 +13,7 @@ import cue.edu.co.yousong_movile.*
 import cue.edu.co.yousong_movile.R
 import cue.edu.co.yousong_movile.ui.icons.YouSongIcons
 import cue.edu.co.yousong_movile.ui.theme.Spacing
+import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Rule
 import org.junit.Test
 
@@ -25,7 +26,8 @@ class DesignGalleryTest {
     @get:Rule val compose = createComposeRule()
 
     @Test fun captureAll() {
-        val gallery = Gallery(compose, "after")
+        val folder = InstrumentationRegistry.getArguments().getString("gallery_folder") ?: "after"
+        val gallery = Gallery(compose, folder)
         val offline = "No pudimos conectar con el local. Revisa tu conexión e inténtalo de nuevo."
         for (dark in listOf(true, false)) {
             val mode = if (dark) "dark" else "light"
@@ -33,14 +35,40 @@ class DesignGalleryTest {
                 gallery.shot("$name-$mode", frames) { GalleryTheme(dark, body) }
 
             shot("01-inicio", PhoneFrames + SmallFrame + TabletFrame) {
-                GalleryShell(Tab.Inicio, Samples.queue) {
-                    HomeScreen("La Sala Azul", Samples.ui(Samples.queue), {}, {}, {}, {})
-                }
+                GalleryShell(Tab.Inicio, Samples.queue) { Home(Samples.queue) }
+            }
+            shot("01b-inicio-carruseles", PhoneFrames + TabletFrame) {
+                GalleryShell(Tab.Inicio, Samples.queue) { Home(Samples.queue, scrolledTo = 2) }
+            }
+            shot("01c-inicio-locales") {
+                GalleryShell(Tab.Inicio, Samples.queue) { Home(Samples.queue, scrolledTo = 4) }
+            }
+            shot("01d-inicio-sin-reproduccion") {
+                GalleryShell(Tab.Inicio, Samples.queueNoPlaying) { Home(Samples.queueNoPlaying) }
             }
             shot("02-inicio-vacio") {
-                GalleryShell(Tab.Inicio, Samples.empty) { HomeScreen("La Sala Azul", Samples.ui(Samples.empty), {}, {}, {}, {}) }
+                GalleryShell(Tab.Inicio, Samples.empty) {
+                    Home(Samples.empty, highlights = Feed.Ready(Highlights(30, emptyList(), emptyList(), emptyList(), emptyList())))
+                }
             }
-            shot("03-buscar-inicial") { GalleryShell(Tab.Buscar, Samples.queue) { Search("", SearchPhase.Idle) } }
+            shot("02b-inicio-cargando") {
+                GalleryShell(Tab.Inicio, Samples.queue) { Home(Samples.queue, Feed.Loading, Feed.Loading, scrolledTo = 1) }
+            }
+            shot("02c-inicio-error") {
+                GalleryShell(Tab.Inicio, Samples.queue) {
+                    Home(Samples.queue, Feed.Failed("La cuota del catálogo se agotó. Inténtalo más tarde."), Feed.Failed(offline),
+                        scrolledTo = 1)
+                }
+            }
+            shot("02d-inicio-sin-conexion") {
+                GalleryShell(Tab.Inicio, null) {
+                    HomeScreen("La Sala Azul", Samples.ui(null, error = offline), Greeting.Night, Feed.Loading, Feed.Loading, HomeActions())
+                }
+            }
+            shot("03-buscar-explorar", PhoneFrames + TabletFrame) { GalleryShell(Tab.Buscar, Samples.queue) { Search("", SearchPhase.Idle) } }
+            shot("03b-explorar-sin-tendencias") {
+                GalleryShell(Tab.Buscar, Samples.queue) { Search("", SearchPhase.Idle, tiles = genreTiles(emptyList())) }
+            }
             shot("04-buscar-cargando") { GalleryShell(Tab.Buscar, Samples.queue) { Search("Aire", SearchPhase.Loading) } }
             shot("05-buscar-sugerencias") {
                 GalleryShell(Tab.Buscar, Samples.queue) { Search("Aire", SearchPhase.Loading, Samples.suggestions) }
@@ -134,8 +162,17 @@ class DesignGalleryTest {
     }
 
     @androidx.compose.runtime.Composable
-    private fun Search(query: String, phase: SearchPhase, suggestions: List<Suggestion> = emptyList(), pending: String? = null) =
-        SearchContent(query, {}, {}, suggestions, {}, phase, Samples.ui(Samples.queue, pending = pending), {}, {}, {}, {})
+    private fun Search(query: String, phase: SearchPhase, suggestions: List<Suggestion> = emptyList(), pending: String? = null,
+        tiles: List<GenreTile> = Samples.tiles) =
+        SearchContent(query, {}, {}, suggestions, {}, phase, Samples.ui(Samples.queue, pending = pending), {}, {}, {}, {},
+            tiles = tiles)
+
+    @androidx.compose.runtime.Composable
+    private fun Home(queue: QueueSnapshot, trends: Feed<Trends> = Samples.trends, highlights: Feed<Highlights> = Samples.highlights,
+        scrolledTo: Int = 0) =
+        HomeScreen("La Sala Azul", Samples.ui(queue), Greeting.Night, trends, highlights, HomeActions(),
+            zone = java.util.TimeZone.getTimeZone("America/Bogota"),
+            listState = androidx.compose.foundation.lazy.rememberLazyListState(scrolledTo))
 
     private fun Int.dp() = androidx.compose.ui.unit.Dp(this.toFloat())
 }

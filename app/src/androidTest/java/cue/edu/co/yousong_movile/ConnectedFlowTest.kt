@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import cue.edu.co.yousong_movile.ui.theme.YousongmovileTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -100,5 +101,26 @@ class ConnectedFlowTest {
         compose.onNodeWithText("Buscar").performClick()
         waitForText("No pudimos conectar con el local", substring = true)
         compose.onAllNodes(hasText("Reintentar"))[0].assertExists()
+    }
+
+    @Test fun homeShowsColombianTrendsFromThePublicEndpointWithoutTheCredential() {
+        start()
+        waitForText("Calle 85")
+        compose.onNodeWithText("Reggaetón · 3:32", useUnmergedTree = true).assertExists()
+        compose.waitUntil(15_000) { backend.count("GET /api/public/establecimientos/sala-azul/destacadas?dias=30") == 1 }
+        assertEquals(1, backend.count("GET /api/public/tendencias"))
+        assertTrue(backend.authorized.none { it.startsWith("/api/public/") })
+        assertTrue(backend.authorized.contains("/api/participante/cola"))
+    }
+
+    @Test fun failingTrendsLeaveTheQueueUsableAndRetryOnRequest() {
+        backend.trendsUp = false
+        start()
+        waitForText("No pudimos cargar esta lista")
+        compose.onAllNodes(hasContentDescription("Votar por Luna azul, 4 votos"))[0].assertIsEnabled()
+        backend.trendsUp = true
+        compose.onAllNodes(hasText("Reintentar"))[0].performClick()
+        waitForText("Calle 85")
+        assertEquals(2, backend.count("GET /api/public/tendencias"))
     }
 }

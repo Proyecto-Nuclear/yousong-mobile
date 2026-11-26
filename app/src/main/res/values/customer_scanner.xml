@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="es">
-    <!-- Matches DarkColors in ui/theme/Color.kt; the camera is a native View, always dark. -->
-    <color name="scanner_background">#0E0F0E</color>
-    <color name="scanner_surface">#171917</color>
-    <color name="scanner_text">#F2F4EE</color>
-    <color name="scanner_text_muted">#B3B8AD</color>
-    <color name="scanner_outline">#6B716A</color>
-    <color name="scanner_primary">#CBDDB0</color>
+    <!-- Matches DarkColors in ui/theme/Color.kt ("Noche de verbena"); the camera is a native View, always dark. -->
+    <color name="scanner_background">#14101F</color>
+    <color name="scanner_surface">#1E1830</color>
+    <color name="scanner_text">#F6F1FF</color>
+    <color name="scanner_text_muted">#BDB4D6</color>
+    <color name="scanner_outline">#8A7FB0</color>
+    <color name="scanner_primary">#FFB547</color>
     <!-- Overrides of zxing-android-embedded resources: scan frame accent and mask. -->
-    <color name="zxing_viewfinder_laser" tools:override="true" tools:ignore="UnusedResources">#B8D8FF</color>
-    <color name="zxing_viewfinder_mask" tools:override="true" tools:ignore="UnusedResources">#990E0F0E</color>
-    <color name="zxing_possible_result_points" tools:override="true" tools:ignore="UnusedResources">#80B8D8FF</color>
-    <color name="zxing_status_text" tools:override="true" tools:ignore="UnusedResources">#B3B8AD</color>
+    <color name="zxing_viewfinder_laser" tools:override="true" tools:ignore="UnusedResources">#3DD6C6</color>
+    <color name="zxing_viewfinder_mask" tools:override="true" tools:ignore="UnusedResources">#9914101F</color>
+    <color name="zxing_possible_result_points" tools:override="true" tools:ignore="UnusedResources">#803DD6C6</color>
+    <color name="zxing_status_text" tools:override="true" tools:ignore="UnusedResources">#BDB4D6</color>
     <style name="Theme.YouSong.Scanner" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/scanner_background</item>
         <item name="android:colorAccent">@color/scanner_primary</item>

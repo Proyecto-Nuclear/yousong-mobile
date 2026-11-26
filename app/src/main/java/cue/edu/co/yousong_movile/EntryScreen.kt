@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -148,15 +149,16 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
         .verticalScroll(rememberScrollState()).padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.readableWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
-            Icon(YouSongIcons.BrandMark, stringResource(R.string.brand_mark_description), Modifier.size(56.dp))
+            Icon(YouSongIcons.BrandMark, stringResource(R.string.brand_mark_description), Modifier.size(56.dp),
+                tint = MaterialTheme.colorScheme.primary)
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Text(stringResource(R.string.entry_title), style = MaterialTheme.typography.headlineLarge,
+                Text(stringResource(R.string.entry_title), style = MaterialTheme.typography.displayLarge,
                     modifier = Modifier.semantics { heading() })
                 Text(stringResource(R.string.entry_body), style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Button(onClick = ::startScan, enabled = active && origin != null && !busy && !scanning,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+            CtaButton(onClick = ::startScan, enabled = active && origin != null && !busy && !scanning,
+                modifier = Modifier.fillMaxWidth()) {
                 Icon(YouSongIcons.QrScan, null, Modifier.size(20.dp)); Spacer(Modifier.width(Spacing.xs))
                 Text(stringResource(if (place == null) R.string.scan_qr else R.string.scan_other_qr))
             }
@@ -180,8 +182,8 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
                 PrivacySection(privacy, f1, f2, enabled = !busy, onF1 = { f1 = it }, onF2 = { f2 = it })
                 if (!fresh) Text(stringResource(R.string.entry_refresh_first), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = { join(place, privacy) }, enabled = active && !busy && fresh && canParticipate(place) && f1,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Text(stringResource(R.string.join_action)) }
+                CtaButton(onClick = { join(place, privacy) }, enabled = active && !busy && fresh && canParticipate(place) && f1,
+                    modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.join_action)) }
             } else if (!busy && !cameraDenied) Text(stringResource(R.string.entry_no_account), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -216,7 +218,7 @@ internal fun EstablishmentCard(place: Establishment, refreshEnabled: Boolean, on
         chip == ServiceChip.Maintenance -> R.string.service_maintenance
         else -> R.string.service_unknown
     })
-    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest) {
+    Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerHighest, contentColor = MaterialTheme.colorScheme.onSurface) {
         Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(place.name, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
@@ -250,6 +252,8 @@ internal fun PrivacySection(privacy: PrivacyPolicy, f1: Boolean, f2: Boolean, en
             Text(stringResource(R.string.privacy_version, privacy.version), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Text(stringResource(R.string.privacy_intro), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         val described = privacy.purposes.associateBy { it.code }
         ConsentRow(f1, enabled, stringResource(R.string.consent_required),
             described["F1"]?.description ?: stringResource(R.string.consent_required_body), onF1)
@@ -259,6 +263,29 @@ internal fun PrivacySection(privacy: PrivacyPolicy, f1: Boolean, f2: Boolean, en
             Row(Modifier.padding(start = Spacing.sm, top = Spacing.xxs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Box(Modifier.padding(top = 8.dp).size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant))
                 Text(purpose.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (privacy.sections.isNotEmpty()) FullPolicy(privacy.sections)
+    }
+}
+
+/** The full notice, closed by default so the two decisions stay visible. */
+@Composable
+private fun FullPolicy(sections: List<PolicySection>) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    TextButton(onClick = { open = !open }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+        Text(stringResource(if (open) R.string.privacy_hide_full else R.string.privacy_read_full))
+    }
+    if (open) Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            sections.forEach { section ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(section.title, style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.semantics { heading() })
+                    Text(section.text, style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
