@@ -41,7 +41,9 @@ private fun CustomerApp(activity: ComponentActivity) {
     // Credentials never enter saved instance state or rememberSaveable.
     var record by remember { mutableStateOf(lifecycle.restore()) }
     val session = record?.second
-    val defaultBase = stringResource(R.string.api_base_url)
+    // A debug build made for a LAN host (-PyousongLanHost) talks to that host; otherwise the configured resource.
+    val resourceBase = stringResource(R.string.api_base_url)
+    val defaultBase = BuildConfig.LAN_API_BASE_URL.ifEmpty { resourceBase }
     var base by remember { mutableStateOf(record?.first ?: defaultBase) }
     var notice by remember { mutableStateOf<String?>(null) }
     var ended by remember { mutableStateOf<String?>(null) }
@@ -60,14 +62,14 @@ private fun CustomerApp(activity: ComponentActivity) {
         val reason = ended
         if (current == null && reason != null) SessionEndedScreen(reason) { ended = null }
         else if (current == null) EntryScreen(base, active, notice) {
-            val origin = requireNotNull(ClientContract.apiBase(base, BuildConfig.DEBUG))
+            val origin = requireNotNull(ClientContract.apiBase(base, BuildConfig.DEBUG, BuildConfig.LAN_API_HOST))
             notice = try { lifecycle.joined(origin, it); null } catch (_: Exception) {
                 lifecycle.ended()
                 resources.getString(R.string.joined_notice_unsafe)
             }
             base = origin; record = origin to it
         } else if (active) {
-            val api = remember(base) { ParticipantApi(requireNotNull(ClientContract.apiBase(base, BuildConfig.DEBUG))) }
+            val api = remember(base) { ParticipantApi(requireNotNull(ClientContract.apiBase(base, BuildConfig.DEBUG, BuildConfig.LAN_API_HOST))) }
             ConnectedScreen(api, current, notice, endSession)
         }
     }

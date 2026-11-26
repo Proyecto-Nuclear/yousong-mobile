@@ -47,7 +47,7 @@ internal fun EntryScreen(base: String, active: Boolean, notice: String?, onJoine
     var scanned by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var cameraDenied by remember { mutableStateOf(false) }
-    val origin = ClientContract.apiBase(base, BuildConfig.DEBUG)
+    val origin = ClientContract.apiBase(base, BuildConfig.DEBUG, BuildConfig.LAN_API_HOST)
     val flow = remember { EntryFlow() }
     val scope = rememberCoroutineScope()
     val resources = LocalResources.current
