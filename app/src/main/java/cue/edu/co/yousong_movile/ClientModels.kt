@@ -36,7 +36,9 @@ object ClientContract {
 data class Establishment(val name: String, val slug: String, val service: String, val canJoin: Boolean,
     val nextOpening: String? = null)
 data class Purpose(val code: String, val description: String)
-data class PrivacyPolicy(val version: String, val purposes: List<Purpose>)
+data class PolicySection(val title: String, val text: String)
+data class PrivacyPolicy(val version: String, val purposes: List<Purpose>,
+    val sections: List<PolicySection> = emptyList())
 // Deliberately not a data class: generated toString must never expose credentials.
 class ParticipantSession(val token: String, val expiresAt: String, val pseudonym: String, val name: String,
     val service: String, val qrSlug: String? = null)

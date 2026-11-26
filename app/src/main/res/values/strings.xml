@@ -166,6 +166,9 @@
     <string name="opening_tomorrow">Abre mañana a las %1$s</string>
     <string name="opening_other">Abre el %1$s a las %2$s</string>
     <string name="privacy_title">Tu privacidad</string>
+    <string name="privacy_intro">Antes de entrar, decide qué autorizas. Ninguna opción viene marcada.</string>
+    <string name="privacy_read_full">Leer la política completa</string>
+    <string name="privacy_hide_full">Ocultar la política</string>
     <string name="privacy_version">Política versión %1$s</string>
     <string name="consent_required">Necesario para participar</string>
     <string name="consent_optional">Opcional: ayudarnos a mejorar</string>

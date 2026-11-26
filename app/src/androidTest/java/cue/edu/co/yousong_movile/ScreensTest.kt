@@ -1,5 +1,6 @@
 package cue.edu.co.yousong_movile
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -230,6 +231,31 @@ class ScreensTest {
         compose.onNodeWithText("Necesario para participar").assertIsOff().performClick().assertIsOn()
         compose.onNodeWithText("Opcional: ayudarnos a mejorar").assertIsOff()
         compose.onNodeWithText("F1", substring = true).assertDoesNotExist()
+    }
+
+    @Test fun fullPolicyIsClosedUntilAskedFor() {
+        val policy = PrivacyPolicy("1.1", listOf(Purpose("F1", "Participar"), Purpose("F2", "Mejorar")),
+            listOf(PolicySection("Tus derechos", "Puedes pedir la supresión.")))
+        compose.setContent { YousongmovileTheme { Column { PrivacySection(policy, false, false, true, {}, {}) } } }
+        compose.onNodeWithText("Tus derechos").assertDoesNotExist()
+        compose.onNodeWithText("Leer la política completa").performClick()
+        compose.onNodeWithText("Tus derechos").assertExists()
+        compose.onNodeWithText("Puedes pedir la supresión.").assertExists()
+    }
+
+    @Test fun twoDigitTrendRanksAreNotCoveredByTheArtwork() {
+        val songs = List(12) { Song("vid%08d".format(it), "Canción $it", "Artista", false, "", 200, null) }
+        compose.setContent {
+            YousongmovileTheme {
+                HomeScreen("La Sala Azul", ui(null), Greeting.Night, Feed.Ready(Trends("CO", "2026-11-25T00:00:00Z", songs)),
+                    Feed.Loading, HomeActions())
+            }
+        }
+        compose.onAllNodes(hasScrollToIndexAction() and hasAnyDescendant(hasTestTag("rank-mark-1")), useUnmergedTree = true).onLast()
+            .performScrollToIndex(9)
+        val mark = compose.onNodeWithTag("rank-mark-10", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val cover = compose.onNodeWithTag("rank-cover-10", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue("numeral ends at ${mark.right}, cover starts at ${cover.left}", mark.right <= cover.left)
     }
 
     @Test fun establishmentShowsFriendlyStateNotTheRawEnum() {

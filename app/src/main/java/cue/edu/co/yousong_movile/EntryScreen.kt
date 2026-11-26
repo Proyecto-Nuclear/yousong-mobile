@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -251,6 +252,8 @@ internal fun PrivacySection(privacy: PrivacyPolicy, f1: Boolean, f2: Boolean, en
             Text(stringResource(R.string.privacy_version, privacy.version), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+        Text(stringResource(R.string.privacy_intro), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         val described = privacy.purposes.associateBy { it.code }
         ConsentRow(f1, enabled, stringResource(R.string.consent_required),
             described["F1"]?.description ?: stringResource(R.string.consent_required_body), onF1)
@@ -260,6 +263,29 @@ internal fun PrivacySection(privacy: PrivacyPolicy, f1: Boolean, f2: Boolean, en
             Row(Modifier.padding(start = Spacing.sm, top = Spacing.xxs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 Box(Modifier.padding(top = 8.dp).size(6.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurfaceVariant))
                 Text(purpose.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        if (privacy.sections.isNotEmpty()) FullPolicy(privacy.sections)
+    }
+}
+
+/** The full notice, closed by default so the two decisions stay visible. */
+@Composable
+private fun FullPolicy(sections: List<PolicySection>) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    TextButton(onClick = { open = !open }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+        Text(stringResource(if (open) R.string.privacy_hide_full else R.string.privacy_read_full))
+    }
+    if (open) Surface(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            sections.forEach { section ->
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(section.title, style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.semantics { heading() })
+                    Text(section.text, style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }

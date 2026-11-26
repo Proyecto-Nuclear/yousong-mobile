@@ -16,6 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.unit.Dp
@@ -221,7 +224,8 @@ private fun NextRow(item: QueueItem, ui: QueueUi, actions: HomeActions) {
 }
 
 private val CardWidth = 148.dp
-private val RankGutter = 40.dp
+private val RankNudge = (-4).dp
+private val RankGap = 4.dp
 
 /** A carousel with its own loading, empty and error states. */
 @Composable
@@ -257,15 +261,18 @@ private fun <T> ShelfSection(title: String, note: String?, shelf: Shelf<T>, empt
 @Composable
 private fun ShelfCard(title: String, artist: String, meta: String?, extra: String?, cover: String?, onClick: () -> Unit,
     rank: Int? = null, live: Boolean = false) {
-    val width = CardWidth + if (rank != null) RankGutter else 0.dp
+    // The gutter follows the numeral's measured width, so "10" and above are never hidden by the cover.
+    val gutter = rank?.let { rankGutter(it) } ?: 0.dp
+    val width = CardWidth + gutter
     Column(Modifier.width(width).clip(MaterialTheme.shapes.medium)
         .clickable(onClickLabel = stringResource(R.string.action_details), onClick = onClick)
         .semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         if (rank != null) Box(Modifier.fillMaxWidth().height(CardWidth)) {
-            RankMark(rank, Modifier.align(Alignment.BottomStart))
-            Cover(cover, title, Modifier.align(Alignment.BottomEnd).size(CardWidth), shape = MaterialTheme.shapes.medium)
+            RankMark(rank, Modifier.align(Alignment.BottomStart).testTag("rank-mark-$rank"))
+            Cover(cover, title, Modifier.align(Alignment.BottomEnd).size(CardWidth).testTag("rank-cover-$rank"),
+                shape = MaterialTheme.shapes.medium)
         } else Cover(cover, title, Modifier.size(CardWidth), shape = MaterialTheme.shapes.medium)
-        Column(Modifier.padding(start = if (rank != null) RankGutter else 0.dp, end = Spacing.xxs, bottom = Spacing.xs)) {
+        Column(Modifier.padding(start = gutter, end = Spacing.xxs, bottom = Spacing.xs)) {
             OneLine(title, MaterialTheme.typography.titleMedium, lines = 2)
             OneLine(artist, MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             meta?.let { OneLine(it.removePrefix(META_SEPARATOR), MaterialTheme.typography.bodySmall.tabular(),
@@ -278,15 +285,24 @@ private fun ShelfCard(title: String, artist: String, meta: String?, extra: Strin
     }
 }
 
-/** The outlined rank numeral. Its size ignores font scale (it is decorative; the rank is read aloud). */
+/** The numeral is sized in dp: it ignores font scale because it is decorative (the rank is read aloud). */
+@Composable
+private fun rankStyle(): TextStyle = with(LocalDensity.current) {
+    RankNumeral.copy(fontSize = 88.dp.toSp(), lineHeight = 88.dp.toSp(), drawStyle = Stroke(width = 2.dp.toPx()))
+}
+
+@Composable
+private fun rankGutter(rank: Int): Dp {
+    val measured = rememberTextMeasurer().measure(rank.toString(), rankStyle(), softWrap = false, maxLines = 1)
+    return with(LocalDensity.current) { measured.size.width.toDp() } + RankNudge + RankGap
+}
+
+/** The outlined rank numeral. */
 @Composable
 private fun RankMark(rank: Int, modifier: Modifier) {
-    val density = LocalDensity.current
     val description = stringResource(R.string.rank_description, rank)
-    val style = RankNumeral.copy(fontSize = with(density) { 88.dp.toSp() }, lineHeight = with(density) { 88.dp.toSp() },
-        drawStyle = Stroke(width = with(density) { 2.dp.toPx() }))
-    Text(rank.toString(), modifier.offset(x = (-4).dp, y = 14.dp).clearAndSetSemantics { contentDescription = description },
-        style = style, color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false)
+    Text(rank.toString(), modifier.offset(x = RankNudge, y = 14.dp).clearAndSetSemantics { contentDescription = description },
+        style = rankStyle(), color = MaterialTheme.colorScheme.primary, maxLines = 1, softWrap = false)
 }
 
 @Composable

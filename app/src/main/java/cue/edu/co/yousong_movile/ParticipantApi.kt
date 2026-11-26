@@ -19,8 +19,11 @@ class ParticipantApi(private val base: String) {
 
     suspend fun policy(): PrivacyPolicy = request("/api/public/politica").let { json ->
         val purposes = json.getJSONArray("finalidades")
+        val sections = json.optJSONArray("secciones")
         PrivacyPolicy(json.getString("version"), List(purposes.length()) {
             purposes.getJSONObject(it).let { item -> Purpose(item.getString("codigo"), item.getString("descripcion")) }
+        }, List(sections?.length() ?: 0) {
+            sections!!.getJSONObject(it).let { item -> PolicySection(item.getString("titulo"), item.getString("texto")) }
         })
     }
 
