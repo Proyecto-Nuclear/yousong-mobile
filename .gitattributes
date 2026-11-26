@@ -1,0 +1,3 @@
+# The Gradle wrapper runs inside Linux containers.
+gradlew text eol=lf
+*.bat text eol=crlf
